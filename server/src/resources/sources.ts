@@ -1,37 +1,66 @@
 /**
- * Vetted public-interest sources (United States). Every entry was checked on 2026-11-14 for:
- *   - permission: public-domain US-government content that may be linked/reused,
+ * Vetted public-interest sources (United States), checked 2026-11-14 for:
+ *   - permission: terms of use / content policy do not prohibit automated access, and linking is allowed,
  *   - robots.txt: the page path is not disallowed,
  *   - no bot challenge: the page is served normally (nothing is bypassed),
- *   - no intervention advice in the official description (the app must not surface treatment advice).
+ *   - Bright Data reachability: a real fetch through the Web Unlocker zone succeeded,
+ *   - no intervention advice in the publisher's own description (the app must not surface treatment advice).
  *
- * Rejected during vetting (do not add without re-checking):
- *   - asha.org: Terms of Use prohibit robots/spiders/scrapers without written permission.
- *   - swallowingdisorderfoundation.com: answers automated requests with 403 (deliberate block).
- *   - dysphagiaresearch.org: Cloudflare bot challenge.
- *   - nidcd.nih.gov 2018 aging news item: its description recommends an exercise programme (intervention).
- *   - nidcd.nih.gov/health/voice-speech-and-language: no page description; summary would have to be invented.
+ * Only the title, the publisher's own short description, dates and the link are stored. Page bodies are not kept.
  *
- * LIVE FINDING 2026-11-14: Bright Data refuses www.nidcd.nih.gov ("classified as Government and blocked by Bright Data
- * as it might breach Bright Data usage policy"); its docs state government websites are blocked across all networks.
- * The NIDCD pages therefore cannot be collected through Bright Data. They are kept here only until replacement
- * non-government sources are vetted; every refresh reports them as refused rather than storing anything.
+ * REJECTED during vetting (re-check before adding any of these):
+ *   Terms forbid robots/scrapers/automated access without written permission:
+ *     asha.org, mda.org, headandneck.org (Head and Neck Cancer Alliance), apdaparkinson.org,
+ *     my.clevelandclinic.org, strokeinfo.org (AbilityPath), nationalmssociety.org
+ *   Terms/content policy restrict storage, reuse or even linking:
+ *     cancer.org (no electronic reuse), michaeljfox.org (linking requires permission)
+ *   Bot protection or blocking of automated requests:
+ *     als.org, hopkinsmedicine.org, hdsa.org, mayoclinic.org (403), stroke.org (403),
+ *     swallowingdisorderfoundation.com (403), dysphagiaresearch.org (Cloudflare challenge)
+ *   Other: oralcancerfoundation.org (site error 526), alz.org (no swallowing page)
+ *   Government sites (nidcd.nih.gov, ninds.nih.gov): public domain, but Bright Data refuses them
+ *     ("classified as Government and blocked by Bright Data"; its docs: government sites are blocked on all
+ *     networks). Government content comes from MedlinePlus' official API instead.
  */
 
-export const NIDCD_LICENSE =
-  "U.S. government work in the public domain (NIDCD website policies). Linking does not imply NIDCD endorsement.";
 export const MEDLINEPLUS_LICENSE =
   "MedlinePlus health topic summary: U.S. government work in the public domain. Source: MedlinePlus, National Library of Medicine.";
 
-/** Pages collected through Bright Data's Web Unlocker API (no official API exists for these). */
-export const NIDCD_PAGES = [
-  "https://www.nidcd.nih.gov/glossary/dysphagia",
-  "https://www.nidcd.nih.gov/glossary/swallowing-disorders",
-  "https://www.nidcd.nih.gov/about/nearly-1-12-children-ages-3-17-has-disorder-related-voice-speech-language-or-swallowing-text-version",
-] as const;
+export interface BrightDataSource {
+  url: string;
+  publisher: string;
+  /** Removed from the end of the page <title>, e.g. " | Parkinson's Foundation". */
+  titleSuffix: RegExp;
+  licenseNote: string;
+}
+
+const linkedOnly = (org: string) =>
+  `© ${org}. DysphaGrip shows only the title and the publisher's own short description, with a link to the original page.`;
+
+/** Pages collected through Bright Data's Web Unlocker API. */
+export const BRIGHT_DATA_SOURCES: readonly BrightDataSource[] = [
+  {
+    url: "https://www.parkinson.org/understanding-parkinsons/non-movement-symptoms/speech-swallowing",
+    publisher: "Parkinson's Foundation",
+    titleSuffix: /\s*\|\s*Parkinson'?s Foundation\s*$/i,
+    licenseNote: linkedOnly("Parkinson's Foundation"),
+  },
+  {
+    url: "https://www.parkinson.org/library/fact-sheets/speech-swallowing",
+    publisher: "Parkinson's Foundation",
+    titleSuffix: /\s*\|\s*Parkinson'?s Foundation\s*$/i,
+    licenseNote: linkedOnly("Parkinson's Foundation"),
+  },
+  {
+    url: "https://www.spohnc.org/swallowing-assessment-for-head-and-neck-cancer-survivors-expectations-and-outcomes/",
+    publisher: "SPOHNC: Support for People with Oral and Head and Neck Cancer",
+    titleSuffix: /\s*\|\s*SPOHNC.*$/i,
+    licenseNote: linkedOnly("SPOHNC"),
+  },
+];
 
 /** Hosts Bright Data may be pointed at. Anything else is refused before any request is made. */
-export const BRIGHT_DATA_ALLOWED_HOSTS = new Set(["www.nidcd.nih.gov"]);
+export const BRIGHT_DATA_ALLOWED_HOSTS = new Set(BRIGHT_DATA_SOURCES.map((s) => new URL(s.url).hostname));
 
 /** Collected through MedlinePlus' official web service (preferred over scraping). */
 export const MEDLINEPLUS_QUERIES = [

@@ -42,22 +42,42 @@ export interface ParsedPage {
   lastUpdated: string | null;
 }
 
-/** NIDCD (Drupal) page: <title>, meta description, optional "Last Updated Date" <time datetime>. */
-export function parseNidcdPage(html: string): ParsedPage {
-  if (looksLikeBotChallenge(html)) throw new Error("Received a bot-challenge page; source skipped");
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Content of <meta name|property="key" content="…"> in either attribute order. */
+const metaContent = (html: string, attr: "name" | "property", key: string): string | undefined => {
+  const k = escapeRe(key);
+  return (
+    html.match(new RegExp(`<meta\\s+${attr}=["']${k}["']\\s+content=["']([^"']*)["']`, "i"))?.[1] ??
+    html.match(new RegExp(`<meta\\s+content=["']([^"']*)["']\\s+${attr}=["']${k}["']`, "i"))?.[1]
+  );
+};
+
+/**
+ * Generic article/page parser: <title> (minus the site suffix), the publisher's own meta description
+ * (or og:description), and a last-modified date if the page states one.
+ */
+export function parseHtmlPage(rawHtml: string, opts: { titleSuffix?: RegExp } = {}): ParsedPage {
+  if (looksLikeBotChallenge(rawHtml)) throw new Error("Received a bot-challenge page; source skipped");
+  const html = rawHtml.replace(/<!--[\s\S]*?-->/g, ""); // markup inside comments is not part of the page
   const rawTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
   if (!rawTitle) throw new Error("Page has no <title>");
-  const title = clean(rawTitle).replace(/\s*\|\s*NIDCD\s*$/i, "");
-  if (/isn.t available|not found/i.test(title)) throw new Error("Page no longer exists");
+  let title = clean(rawTitle);
+  if (opts.titleSuffix) title = title.replace(opts.titleSuffix, "").trim();
+  if (!title || /isn.t available|not found|page cannot be found/i.test(title)) throw new Error("Page no longer exists");
 
-  const meta =
-    html.match(/<meta\s+name=["']description["']\s+content=["']([^"']*)["']/i)?.[1] ??
-    html.match(/<meta\s+content=["']([^"']*)["']\s+name=["']description["']/i)?.[1];
-  const summary = meta ? truncate(clean(meta).replace(/^\[back to infographic\]\s*/i, "")) : "";
+  const meta = metaContent(html, "name", "description") ?? metaContent(html, "property", "og:description");
+  let summary = meta ? clean(meta).replace(/^\[back to infographic\]\s*/i, "") : "";
   if (!summary) throw new Error("Page has no description; refusing to invent a summary");
+  // A publisher description cut mid-sentence by the site itself is shown with an ellipsis, not completed by us.
+  if (!/[.!?…)"”]$/.test(summary)) summary = `${summary.replace(/[,;:\s]+$/, "")}…`;
+  summary = truncate(summary);
 
-  const time = html.match(/Last Updated Date:[\s\S]{0,200}?<time[^>]*datetime=["']([^"']+)["']/i)?.[1];
-  const lastUpdated = time && !Number.isNaN(Date.parse(time)) ? new Date(time).toISOString() : null;
+  const stated =
+    metaContent(html, "property", "article:modified_time") ??
+    metaContent(html, "property", "og:updated_time") ??
+    html.match(/Last Updated Date:[\s\S]{0,200}?<time[^>]*datetime=["']([^"']+)["']/i)?.[1];
+  const lastUpdated = stated && !Number.isNaN(Date.parse(stated)) ? new Date(stated).toISOString() : null;
   return { title, summary, lastUpdated };
 }
 

@@ -49,9 +49,9 @@ export function ResourcesPanel({ brightDataConfigured }: { brightDataConfigured:
         )}
       </div>
     }>
-      <p className="muted small">Public information from U.S. government health sources, to help people find reliable information
-        and qualified care. These are links to the original publishers, not advice from DysphaGrip. A speech-language pathologist
-        or physician can assess swallowing.</p>
+      <p className="muted small">Public information from U.S. health organisations: MedlinePlus (National Library of Medicine) and
+        non-profit patient organisations. These are links to the original publishers, not advice from DysphaGrip. A
+        speech-language pathologist or physician can assess swallowing.</p>
       {error && <p className="error">{error}</p>}
       {items === null ? <p className="muted small">Loading…</p> : shown.length === 0 ? (
         <p className="empty">{note ?? "No resources collected yet."}</p>
@@ -66,7 +66,7 @@ export function ResourcesPanel({ brightDataConfigured }: { brightDataConfigured:
                 <span className={`via via-${r.collected_via}`}>{VIA[r.collected_via]}</span>
                 <span>Retrieved {day(r.retrieved_at)}</span>
                 {r.source_last_updated && <span>Source updated {day(r.source_last_updated)}</span>}
-                <span title={r.license_note}>Public domain</span>
+                <span title={r.license_note}>{/public domain/i.test(r.license_note) ? "Public domain" : `© ${r.publisher.split(":")[0]} · linked`}</span>
               </div>
             </li>
           ))}
@@ -75,7 +75,8 @@ export function ResourcesPanel({ brightDataConfigured }: { brightDataConfigured:
       {items !== null && !error && (
         <p className="muted small">
           {items.length} source{items.length === 1 ? "" : "s"} · {viaBrightData} collected through Bright Data's Web Unlocker API from
-          vetted public-domain pages (robots rules and terms checked; no bot challenges bypassed) · refresh with{" "}
+          vetted public pages (terms and robots rules checked; no bot challenges bypassed; only titles and the publisher's own
+          descriptions are stored) · refresh with{" "}
           <code>npm run resources:refresh</code>
         </p>
       )}

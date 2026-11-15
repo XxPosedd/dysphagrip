@@ -15,7 +15,7 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 | Track | Contribution | Status |
 |---|---|---|
 | Best Overall Hack | End-to-end live audio + motion capture, synchronised dashboard, signal quality, history | Audio service ✅ · dashboard ✅ (audio) · motion 🚧 |
-| Bright Data: Data for Good | Attributed US public-domain swallowing resources (NIH NIDCD via Bright Data Web Unlocker; MedlinePlus EN/ES via official API) with source, publisher, licence and retrieval date | ✅ Built and tested · MedlinePlus live · NIDCD collection pending Bright Data token |
+| Bright Data: Data for Good | Attributed US swallowing resources: Parkinson's Foundation and SPOHNC pages via **Bright Data Web Unlocker**, MedlinePlus EN/ES via its official API, with publisher, licence and retrieval date | ✅ Live: 5 resources in Neon, 3 collected through Bright Data |
 | ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Live: voice "Matilda", spoken cues verified in the dashboard |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
@@ -114,24 +114,26 @@ and then served from memory. Every announcement is also shown as text (🔊 spok
 
 ## Bright Data: public-interest resources (US)
 
-The dashboard's **Swallowing support resources (US)** panel lists public, attributed information from U.S. government
-health sources: links to the publishers, never advice from DysphaGrip.
+The dashboard's **Swallowing support resources (US)** panel lists public, attributed information from U.S. health
+organisations: links to the publishers, never advice from DysphaGrip.
 
 | Source | How it is collected | Why |
 |---|---|---|
-| NIH NIDCD: *Dysphagia*, *Swallowing Disorders*, *Nearly 1 in 12 children… swallowing* | **Bright Data Web Unlocker API** | Public domain; robots.txt allows it; no API exists |
-| MedlinePlus: *Swallowing Disorders* (EN) and *Problemas para tragar* (ES) | MedlinePlus **official web service** | Public domain; an official API exists, so scraping would be wrong |
+| Parkinson's Foundation: *Speech & Swallowing Issues*, *Speech & Swallowing in Parkinson's* (fact sheet) | **Bright Data Web Unlocker API** | Non-profit; robots.txt allows it; policy doesn't prohibit automated access; no API |
+| SPOHNC: *Swallowing Assessment for Head and Neck Cancer Survivors* | **Bright Data Web Unlocker API** | Non-profit; robots.txt allows it; policy doesn't prohibit automated access; no API |
+| MedlinePlus: *Swallowing Disorders* (EN), *Problemas para tragar* (ES) | MedlinePlus **official web service** | Public domain; an official API exists, so scraping would be wrong |
 
-Rejected while vetting (see `server/src/resources/sources.ts`): ASHA (terms forbid scrapers), the Swallowing Disorder
-Foundation (blocks automated requests), the Dysphagia Research Society (bot challenge; we never bypass one), and pages whose
-official description gives intervention advice or that have no description to quote.
+Only the **title, the publisher's own short description, dates and the link** are stored; page bodies are not kept,
+and non-profit entries are marked "© publisher · linked". Nineteen US sources were vetted; 16 were rejected (terms forbid
+scrapers, bot protection, restricted reuse, or no relevant page), and **Bright Data refuses government sites** such as
+nih.gov, so government information comes through MedlinePlus' API instead. Every rejection and reason is in
+`server/src/resources/sources.ts`.
 
 Setup:
-1. In Bright Data's control panel create a **Web Unlocker API** zone; its *Overview* tab shows the API key and zone name.
-2. Add `BRIGHTDATA_API_TOKEN=…` and `BRIGHTDATA_ZONE=…` to `.env`.
-3. Run `npm run resources:refresh`. It collects every source (2 s between pages), stores them in Neon with source URL,
-   publisher, language, collection method, licence note, source date and retrieval time, and reports any failures per
-   source. It is a CLI script on purpose, so nobody can spend your Bright Data credits through the website.
+1. In Bright Data's control panel create a **Web Unlocker API** zone (5,000 free requests/month; each refresh uses 3).
+2. Add `BRIGHTDATA_API_TOKEN=…` (your account API key) and `BRIGHTDATA_ZONE=…` (the zone name) to `.env`.
+3. Run `npm run resources:refresh`. It collects each source (2 s apart), upserts into Neon, and reports any
+   failure per source. It is a CLI script on purpose, so nobody can spend your Bright Data credits through the website.
 
 ## Neon (database)
 
@@ -204,7 +206,7 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [x] Phase 5: React dashboard (audio side live; motion panels wait for Phase 3)
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
 - [x] Phase 7: ElevenLabs (live: cues spoken in a real session; allowlisted phrases, caching, rate limit)
-- [x] Phase 8: Bright Data (live for MedlinePlus; NIDCD pages collect once `BRIGHTDATA_API_TOKEN` + `BRIGHTDATA_ZONE` are set)
+- [x] Phase 8: Bright Data (live: 3 non-profit pages via Bright Data + 2 MedlinePlus topics via official API)
 - [ ] Phase 9: deployment
 
 ## Repository

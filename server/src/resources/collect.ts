@@ -1,7 +1,7 @@
 import type { BrightDataClient } from "../integrations/brightdata.js";
-import { parseMedlinePlusXml, parseNidcdPage } from "./parse.js";
+import { parseHtmlPage, parseMedlinePlusXml } from "./parse.js";
 import {
-  FETCH_DELAY_MS, MEDLINEPLUS_LICENSE, MEDLINEPLUS_QUERIES, NIDCD_LICENSE, NIDCD_PAGES, SWALLOWING_TOPIC,
+  BRIGHT_DATA_SOURCES, FETCH_DELAY_MS, MEDLINEPLUS_LICENSE, MEDLINEPLUS_QUERIES, SWALLOWING_TOPIC,
 } from "./sources.js";
 import type { PublicResource } from "./types.js";
 
@@ -37,24 +37,23 @@ export async function collectResources(deps: CollectDeps): Promise<CollectReport
   const resources: PublicResource[] = [];
   const errors: CollectReport["errors"] = [];
 
-  // 1) NIDCD pages via Bright Data Web Unlocker (no official API exists for these pages).
+  // 1) Non-profit pages via Bright Data Web Unlocker (no official API exists for these pages).
   if (!deps.brightData) {
-    log("Bright Data not configured (BRIGHTDATA_API_TOKEN / BRIGHTDATA_ZONE): skipping NIDCD pages.");
+    log("Bright Data not configured (BRIGHTDATA_API_TOKEN / BRIGHTDATA_ZONE): skipping Bright Data sources.");
   } else {
-    for (const [i, url] of NIDCD_PAGES.entries()) {
+    for (const [i, src] of BRIGHT_DATA_SOURCES.entries()) {
       if (i > 0 && delay > 0) await sleep(delay);
       try {
-        const page = parseNidcdPage(await deps.brightData.fetchPage(url));
+        const page = parseHtmlPage(await deps.brightData.fetchPage(src.url), { titleSuffix: src.titleSuffix });
         resources.push({
-          source_url: url, title: page.title, summary: page.summary,
-          publisher: "National Institute on Deafness and Other Communication Disorders (NIH)",
-          language: "en", collected_via: "bright_data_web_unlocker", license_note: NIDCD_LICENSE,
+          source_url: src.url, title: page.title, summary: page.summary, publisher: src.publisher,
+          language: "en", collected_via: "bright_data_web_unlocker", license_note: src.licenseNote,
           source_last_updated: page.lastUpdated, retrieved_at: now().toISOString(),
         });
-        log(`✓ ${url}`);
+        log(`✓ ${src.url}`);
       } catch (e) {
-        errors.push({ source: url, error: (e as Error).message });
-        log(`✗ ${url}: ${(e as Error).message}`);
+        errors.push({ source: src.url, error: (e as Error).message });
+        log(`✗ ${src.url}: ${(e as Error).message}`);
       }
     }
   }

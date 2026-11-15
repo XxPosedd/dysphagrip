@@ -99,3 +99,15 @@
 - **Attribution in the UI**: publisher, link, collection method, retrieval date, source date (when stated), licence note,
   and a "not advice from DysphaGrip" notice. English and Spanish entries can be filtered.
 - Tests run against real saved pages (public domain), so the suite never spends Bright Data credits.
+
+### Phase 8 update: sources after live testing
+
+- Live finding: **Bright Data refuses government websites** (HTTP 200 with an empty body and `x-brd-error: … classified as
+  Government and blocked by Bright Data …`; its docs say government sites are blocked on all networks, and KYC does not
+  guarantee access). The NIDCD pages were dropped; government content stays via the MedlinePlus API.
+- Replacement sources were vetted the same way (terms, robots.txt, bot protection, relevance, description wording) plus a
+  **live Bright Data test fetch**. 19 US sources were checked; Parkinson's Foundation (2 pages) and SPOHNC (1 page) passed.
+- These pages are copyrighted, so only title, the publisher's own description, dates and URL are stored and shown with
+  "© publisher · linked". Test fixtures keep only each page's `<title>`/`<meta>` tags, not the body.
+- Client fix: a 200 response carrying `x-brd-error`, or an empty body, is now an error rather than a "page". The parser
+  ignores markup inside HTML comments.

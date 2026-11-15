@@ -3,6 +3,7 @@
 export type QualityLabel = "ok" | "no_signal" | "clipping" | "mains_hum";
 
 export interface AudioFeatures {
+  raw_rms?: number; // Present on Proyecto 2 audio-service frames.
   rms_dbfs: number;
   peak: number;
   clip_fraction: number;
@@ -90,6 +91,7 @@ export interface MotionStatus {
   samples_total?: number;
   seq_gaps?: number;
   parse_errors?: number;
+  timestamp_source?: "board" | "host_arrival" | null;
   sync?: { offset_ms: number | null; jitter_p95_ms: number | null; drift_ppm: number | null; board_resets?: number };
 }
 
@@ -116,7 +118,7 @@ export interface AudioDevice {
   um2_match: "strong" | "possible" | null;
 }
 
-export type MarkerKind = "manual" | "audio_activity" | "quality" | "movement_interference";
+export type MarkerKind = "manual" | "audio_activity" | "quality" | "movement_interference" | "possible_swallow_event";
 
 export interface EventMarker {
   id: string;

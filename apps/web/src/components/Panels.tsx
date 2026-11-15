@@ -66,7 +66,7 @@ export function QualityPanel({ frame, stable }: { frame: AudioFrame | null; stab
 
 // ---------- Event markers ----------
 const KIND_TEXT: Record<EventMarker["kind"], string> = { manual: "Manual", audio_activity: "Activity", quality: "Quality",
-  movement_interference: "Movement" };
+  movement_interference: "Movement", possible_swallow_event: "Candidate" };
 
 export function MarkerList({ markers, canAdd, onAdd }: { markers: EventMarker[]; canAdd: boolean; onAdd: () => void }) {
   const list = [...markers].reverse();

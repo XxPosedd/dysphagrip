@@ -1,3 +1,5 @@
+import { FusionDetector, type FusionEvent } from "./fusion";
+import { PRACTICE_ACTIONS, type Category, type ExperimentSession } from "./practice";
 import { ActivitySegmenter, QualityDebouncer } from "./events";
 import type { AudioFrame, AudioSourceInfo, EventMarker, MotionFrame, QualityLabel, SessionPayload, SessionSummary, StoredSession, TimelinePoint } from "./types";
 
@@ -38,6 +40,8 @@ export class SessionRecorder {
   motionSamples = 0;
   private interferenceSince: number | null = null;
 
+  readonly fusion = new FusionDetector();
+  readonly experiment: ExperimentSession;
   private segmenter = new ActivitySegmenter();
   private quality = new QualityDebouncer();
   private qualityEpisode: { label: QualityLabel; start: number } | null = null;
@@ -49,6 +53,7 @@ export class SessionRecorder {
 
   constructor(startUnixMs: number, readonly source: AudioSourceInfo | null, private maxPoints = 72_000) {
     this.startedAtUnixMs = startUnixMs;
+    this.experiment = { startedAt: startUnixMs, duration: null, candidates: [], marks: [] };
   }
 
   get elapsedMs(): number {
@@ -77,6 +82,11 @@ export class SessionRecorder {
     this.frames += 1;
     this.dropped += frame.dropped_samples;
     const f = frame.features;
+    if (f.raw_rms !== undefined) {
+      const frameStart = frame.t_start_unix_ms === null
+        ? t - (frame.n_samples / frame.fs) * 1000 : frame.t_start_unix_ms - this.startedAtUnixMs;
+      this.recordCandidate(this.fusion.onAudio(t, f.raw_rms, frameStart));
+    }
     this.maxRms = Math.max(this.maxRms, f.rms_dbfs);
     this.qualityMs[frame.quality.label] += dt;
 
@@ -101,6 +111,9 @@ export class SessionRecorder {
     if (!this.running || !frame.samples.length) return;
     const t = frame.samples[frame.samples.length - 1].t_unix_ms - this.startedAtUnixMs;
     if (t < 0) return;
+    for (const sample of frame.samples) {
+      this.recordCandidate(this.fusion.onMotion(sample.t_unix_ms - this.startedAtUnixMs, sample));
+    }
     this.motionSamples += frame.samples.length;
     const active = frame.features.interference === true;
     if (this.motionPoints.length >= this.maxPoints) this.motionPoints.shift();
@@ -130,6 +143,22 @@ export class SessionRecorder {
       label: "Movement interference" });
   }
 
+  private recordCandidate(event: FusionEvent | null) {
+    if (!event) return;
+    const id = this.experiment.candidates.length + 1;
+    this.experiment.candidates.push({ id, ms: event.ms, audioRms: event.audioRms, imuActivity: event.imuActivity });
+    this.emit({ id: newId(), kind: "possible_swallow_event", t_ms: event.ms,
+      label: "Posible deglución", note: `Audio + MPU6050 · Δt ${Math.round(event.gapMs)} ms` });
+  }
+
+  markObservation(category: Category, ms: number) {
+    if (!this.running || !this.fusion.calibrated || !this.fusion.receiving(ms)) return;
+    const action = PRACTICE_ACTIONS.find(item => item.category === category);
+    if (!action) return;
+    this.experiment.marks.push({ id: this.experiment.marks.length + 1, category, ms });
+    this.emit({ id: newId(), kind: "manual", t_ms: ms, label: action.title, note: category });
+  }
+
   addManualMarker(t_ms: number = this.lastT, note?: string): EventMarker {
     const m: EventMarker = { id: newId(), kind: "manual", t_ms, label: "Manual marker", note };
     this.emit(m);
@@ -144,6 +173,7 @@ export class SessionRecorder {
       this.closeQualityEpisode(t);
       this.closeInterference(t);
       this.endedAtUnixMs = endUnixMs;
+      this.experiment.duration = t;
     }
     return this.summary();
   }

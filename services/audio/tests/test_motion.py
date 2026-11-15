@@ -234,3 +234,24 @@ def test_motion_endpoints_and_websocket_frames():
             assert len(frame["samples"]) == 10 and "movement_score" in frame["features"]
         assert c.post("/motion/stop").json()["running"] is False
         assert c.get("/health").json()["motion_running"] is False
+
+
+def test_proyecto2_timed_and_legacy_stream():
+    line = b"Tilt X: -0.99 Y: 0.00 Z: 0.20 | Turn X: 1.00 Y: 2.00 Z: 3.00"
+    stream, source = make_stream()
+    now = time.time_ns()
+    source.on_line(line, now)
+    frame = stream.drain_frame()
+    assert frame["samples"][0]["t_unix_ms"] == pytest.approx(now / 1e6, abs=.01, rel=0)
+    assert frame["samples"][0]["gz"] == 3
+    assert stream.status()["timestamp_source"] == "host_arrival"
+    assert stream.status()["sync"]["offset_ms"] is None
+
+    source.on_line(line + b" seq=10 t_ms=900", now + 40_000_000)
+    source.on_line(line + b" seq=12 t_ms=980", now + 121_000_000)
+    samples = stream.drain_frame()["samples"]
+    assert samples[1]["t_unix_ms"] - samples[0]["t_unix_ms"] == pytest.approx(80, abs=.01)
+    assert stream.status()["seq_gaps"] == 1
+    assert stream.status()["timestamp_source"] == "board"
+    for malformed in (line + b".0", line + b" seq=21", line.replace(b"0.20", b"1e999")):
+        assert parse_line(malformed) is None

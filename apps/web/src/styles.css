@@ -239,3 +239,22 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: va
 .motion-score { margin-top: 10px; }
 .metric strong small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
 .kind-movement_interference { border-left-color: var(--status-warning); }
+
+/* ---------- Dashboard tabs and anomaly review ---------- */
+.tab-nav { display: flex; gap: 8px; padding: 6px; }
+.tab-button { border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-secondary); padding: 8px 14px; font-weight: 650; cursor: pointer; }
+.tab-button.active { background: var(--accent); color: var(--accent-ink); }
+.anomaly-view { display: flex; flex-direction: column; gap: 14px; min-height: 280px; }
+.anomaly-lead { font-size: 15px; }
+.anomaly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.anomaly-explanation { display: flex; flex-direction: column; gap: 8px; max-width: 900px; color: var(--text-secondary); }
+.anomaly-explanation h3.sub { margin: 4px 0 0; }
+.anomaly-explanation a { color: var(--accent); }
+.anomaly-result { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
+.anomaly-result-head { display: flex; align-items: center; }
+.anomaly-result ul { margin: 0; padding-left: 20px; color: var(--text-secondary); }
+.anomaly-result li { margin: 3px 0; }
+.anomaly-flagged { border-left: 4px solid var(--status-warning); }
+.anomaly-within { border-left: 4px solid var(--status-good); }
+.anomaly-blocked { border-left: 4px solid var(--text-muted); }
+.anomaly-result a { color: var(--accent); }

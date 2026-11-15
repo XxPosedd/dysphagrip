@@ -1,11 +1,11 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json ./
-COPY server/package.json server/package.json
-COPY apps/web/package.json apps/web/package.json
-RUN npm install && npm run install:all
-COPY . .
-RUN npm run build
+COPY apps/web/package*.json ./apps/web/
+COPY server/package*.json ./server/
+RUN npm ci --prefix apps/web && npm ci --prefix server
+COPY apps/web ./apps/web
+COPY server ./server
+RUN npm run build --prefix apps/web && npm run build --prefix server && npm prune --omit=dev --prefix server
 
 FROM node:20-alpine
 WORKDIR /app
@@ -15,4 +15,4 @@ COPY --from=build /app/server/node_modules ./server/node_modules
 COPY --from=build /app/server/dist ./server/dist
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 EXPOSE 3000
-CMD ["npm","start"]
+CMD ["node", "server/dist/index.js"]

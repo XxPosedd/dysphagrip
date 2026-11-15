@@ -1,7 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
+import Laboratorio from "./Laboratorio";
 import "./styles.css";
+
+const Monitor = React.lazy(() => import("./App"));
 
 /** Keeps a rendering error from blanking the whole dashboard during a demo. */
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -26,10 +28,17 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
 }
 
+const monitor = new URLSearchParams(window.location.search).get("vista") === "monitor";
+document.documentElement.lang = monitor ? "en" : "es";
+document.title = monitor ? "DysphaGrip · Live monitor" : "Proyecto 2 · DysphaGrip";
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      {monitor ? <>
+        <nav className="monitor-return"><a href="?">← Laboratorio de Proyecto 2</a></nav>
+        <React.Suspense fallback={<p role="status" className="app">Abriendo monitor…</p>}><Monitor /></React.Suspense>
+      </> : <Laboratorio />}
     </ErrorBoundary>
   </React.StrictMode>,
 );

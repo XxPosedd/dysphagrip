@@ -124,12 +124,13 @@ export function Timeline({ recorder, tick, motionConnected }: {
 
       // Manual markers: vertical guide through the level track + flag in the marker lane
       for (const m of recorder.markers) {
-        if (m.kind !== "manual" || m.t_ms < t0) continue;
+        if ((m.kind !== "manual" && m.kind !== "possible_swallow_event") || m.t_ms < t0) continue;
+        const markerColor = m.kind === "manual" ? t["series-manual"] : t["series-activity"];
         const x = Math.round(xOf(m.t_ms)) + 0.5;
-        ctx.strokeStyle = t["series-manual"]; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+        ctx.strokeStyle = markerColor; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
         ctx.beginPath(); ctx.moveTo(x, TRACKS.level.y); ctx.lineTo(x, TRACKS.markers.y); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = t["series-manual"];
+        ctx.fillStyle = markerColor;
         ctx.beginPath(); ctx.moveTo(x, TRACKS.markers.y + 2); ctx.lineTo(x + 9, TRACKS.markers.y + 8);
         ctx.lineTo(x, TRACKS.markers.y + 14); ctx.closePath(); ctx.fill();
       }
@@ -229,6 +230,7 @@ export function Timeline({ recorder, tick, motionConnected }: {
         <span><i className="sw dash" />Noise floor</span>
         <span><i className="sw" style={{ background: "var(--series-activity)" }} />Audio activity (experimental)</span>
         <span><i className="sw flag" style={{ background: "var(--series-manual)" }} />Manual marker</span>
+        <span><i className="sw flag" style={{ background: "var(--series-activity)" }} />Audio + motion candidate</span>
         <span><i className="sw" style={{ background: "var(--status-good)" }} />OK</span>
         <span><i className="sw" style={{ background: "var(--status-warning)" }} />Hum</span>
         <span><i className="sw" style={{ background: "var(--status-serious)" }} />Clipping</span>

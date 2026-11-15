@@ -10,6 +10,25 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 > treatment or emergency decisions. Demos use consenting healthy volunteers and ordinary,
 > comfortable activity only. See [docs/SAFETY_AND_CLAIMS.md](docs/SAFETY_AND_CLAIMS.md).
 
+## Proyecto 2 · probar la página sin Arduino
+
+Desde la raíz de esta rama, con Node.js 20 o superior:
+
+```sh
+npm ci --prefix apps/web
+npm run dev --prefix apps/web
+```
+
+Abre la dirección que imprime Vite (normalmente <http://localhost:5173>). El laboratorio funciona en el navegador sin Arduino App Lab, micrófono, Python ni claves de servicios.
+
+- En **Práctica**, inicia una sesión, genera un pulso de audio y otro de movimiento dentro de 0.65 s (o genera ambos juntos). Marca la acción con los botones o las teclas **1–5**. Al terminar puedes descargar los resultados simulados.
+- En **Revisar un experimento**, selecciona una carpeta de sesión de `prueba2/experiments/`, o descomprime primero el ZIP exportado por la práctica. Se leen las etiquetas, las predicciones, sus correspondencias y el resumen. Si la sesión de Python incluye `captures/mark_XXXX/`, podrás escuchar el WAV e inspeccionar los seis ejes del MPU6050. Los archivos seleccionados se procesan localmente.
+- **Monitor en vivo** abre el tablero de adquisición en otra pestaña. Para datos físicos, inicia los servicios descritos más abajo. Con el equipo de Proyecto 2, arranca el servicio con `python -m dysphagrip_audio serve`, selecciona **M-Audio AIR 192|6, Input 1**, y conecta el puerto de la placa. El receptor admite el firmware NDJSON de este repositorio y las líneas `Tilt X/Y/Z | Turn X/Y/Z` de Proyecto 2 a 115200 baudios. Si la línea incluye `seq` y `t_ms` usa el reloj de la placa. Con firmware anterior usa el instante de llegada a la computadora.
+
+Al iniciar una sesión del monitor, el detector espera ambas señales, descarta 3 s de preparación y calcula sus umbrales con al menos 5 s de reposo y 20 muestras por sensor. Un corte de más de 1 s requiere una nueva calibración. Durante la sesión, las teclas 1–5 registran observaciones. Al finalizar se puede descargar el informe de cuatro CSV. Para guardar los nuevos marcadores en una instalación existente de Neon, ejecuta `npm run db:migrate` antes de usar el monitor.
+
+El monitor web trabaja con características de audio y movimiento. Los WAV por marca se generan con `sensor_fusion_live.py --experiment` en el proyecto Python original. Los resultados de la práctica sirven para probar el flujo de trabajo y no miden el rendimiento con personas.
+
 ## Sponsor tracks
 
 | Track | Contribution | Status |
@@ -84,7 +103,7 @@ npm run dev
 
 ## Dashboard
 
-Open http://localhost:5173 with the audio service and `npm run dev` running.
+Open http://localhost:5173/?vista=monitor with the audio service and `npm run dev` running.
 
 | Area | What it shows |
 |---|---|
@@ -97,7 +116,7 @@ Open http://localhost:5173 with the audio service and `npm run dev` running.
 | Session timeline | Whole session or last 30 s: level and noise floor, audio-activity segments, manual markers, quality strip, motion lane; hover crosshair |
 | Event markers | Manual markers (button or **M** key), automatic *audio activity (experimental)* segments, quality episodes |
 | Voice feedback | "Recording started", "Audio signal detected", quality warnings, "Session saved successfully". Always shown as text; spoken via ElevenLabs once configured |
-| Session history | Per-session summary (duration, activity, markers, median floor, time-by-quality). Kept in the browser tab until Neon (Phase 6) |
+| Session history | Per-session summary (duration, activity, markers, median floor, time-by-quality). Kept in the browser tab, saved to Neon when configured |
 
 Keyboard: **M** adds a manual marker during a session.
 
@@ -162,14 +181,14 @@ the history panel (cascade-deletes their markers and quality rows).
 | Table | Purpose |
 |---|---|
 | `recording_sessions` | One row per session (UUID id) with the summary metrics above |
-| `session_markers` | Manual, audio-activity (experimental), quality and (later) movement-interference markers |
+| `session_markers` | Manual observations, experimental audio activity, candidate coincidences, quality and movement-interference markers |
 | `session_quality` | Time in each quality state: ok / no_signal / clipping / mains_hum |
 | `public_resources` | Reserved for Bright Data (Phase 8) |
 
 ## Tests and checks
 
 ```bash
-cd services/audio && python -m pytest -q    # 33 audio tests
+(cd services/audio && python -m pytest -q)  # audio and motion tests
 npm test                                    # API (vitest + supertest), dashboard logic + API contract (vitest)
 npm run test:db                             # live Neon round-trip (needs DATABASE_URL; skipped otherwise)
 npm run typecheck                           # server + web strict TypeScript
@@ -203,7 +222,7 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [x] Phase 2: Python audio service (UM2 detection, device selection, capture, waveform, spectrogram, features)
 - [x] Phase 3: MPU-6050 firmware + receiver (code + tests done; first hardware bring-up pending; see hardware/unoq_mpu6050)
 - [x] Phase 4: shared session clock (audio and motion on the Mac clock; minimum-latency offset, jitter and drift reported)
-- [x] Phase 5: React dashboard (audio side live; motion panels wait for Phase 3)
+- [x] Phase 5: React dashboard (audio side live; motion panels receive IMU frames)
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
 - [x] Phase 7: ElevenLabs (live: cues spoken in a real session; allowlisted phrases, caching, rate limit)
 - [x] Phase 8: Bright Data (live: 3 non-profit pages via Bright Data + 2 MedlinePlus topics via official API)
@@ -216,7 +235,7 @@ GitHub: https://github.com/XxPosedd/dysphagrip (private).
 To set up another machine (e.g. the MacBook used for audio capture):
 
 ```bash
-git clone https://github.com/XxPosedd/dysphagrip.git
+git clone --branch webpage https://github.com/XxPosedd/dysphagrip.git
 cd dysphagrip
 ```
 

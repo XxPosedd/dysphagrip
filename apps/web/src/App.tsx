@@ -9,6 +9,7 @@ import { useAudioService } from "./hooks/useAudioService";
 import { useVoice } from "./hooks/useVoice";
 import { api } from "./lib/api";
 import { VOICE, type VoiceText } from "./lib/voicePhrases";
+import { PRACTICE_ACTIONS, downloadExperiment, type Category } from "./lib/practice";
 import { formatDuration } from "./lib/format";
 import { SessionRecorder, buildSessionPayload, describeSource } from "./lib/session";
 import type { ApiHealth, QualityLabel, SessionSummary, StoredSession } from "./lib/types";
@@ -21,7 +22,7 @@ const QUALITY_VOICE: Record<Exclude<QualityLabel, "ok">, VoiceText> = {
 
 export default function App() {
   const audio = useAudioService();
-  const voice = useVoice(true);
+  const voice = useVoice(false);
   const voiceRef = useRef(voice);
   voiceRef.current = voice;   // listeners registered on the recorder always use the current toggle state
   const [health, setHealth] = useState<ApiHealth | null>(null);
@@ -64,14 +65,16 @@ export default function App() {
   }, [loadHealth]);
   useEffect(() => { if (db === "ok") void loadSessions(); }, [db, loadSessions]);
 
-  // ---- Device selection defaults: running device > detected UM2 > system default ----
+  // Prefer the interface used by Proyecto 2 when the input is stopped.
   useEffect(() => {
     if (source?.device_index !== undefined) { setDevice(source.device_index); setChannel(source.channel ?? 0); return; }
     if (device !== null || !audio.devices.length) return;
-    const def = audio.um2Candidate ?? audio.devices.find((d) => d.is_default)?.index ?? audio.devices[0].index;
-    setDevice(def);
+    const air = audio.devices.find(d => /air[\s_-]*192/i.test(d.name));
+    const um2 = audio.devices.find(d => d.index === audio.um2Candidate);
+    const preferred = air ?? um2 ?? audio.devices.find(d => d.is_default) ?? audio.devices[0];
+    setDevice(preferred.index);
     // UM2: the contact pickup is expected on input 2 (ch 1). Confirm with `probe`.
-    setChannel(audio.um2Candidate !== null ? 1 : 0);
+    setChannel(!air && um2 && um2.max_input_channels > 1 ? 1 : 0);
   }, [audio.devices, audio.um2Candidate, source?.device_index, source?.channel, device]);
   const selected = audio.devices.find((d) => d.index === device);
 
@@ -165,17 +168,28 @@ export default function App() {
     setTick((t) => t + 1);
   }, []);
 
+  const markObservation = useCallback((category: Category) => {
+    const rec = recorderRef.current;
+    if (!rec) return;
+    rec.markObservation(category, Date.now() - rec.startedAtUnixMs);
+    setTick(t => t + 1);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.metaKey || e.ctrlKey) return;
+      if (e.repeat || e.altKey || !recorderRef.current?.running) return;
+      const action = PRACTICE_ACTIONS.find(item => item.key === e.key);
+      if (action) { e.preventDefault(); markObservation(action.category); }
       if (e.key === "m" || e.key === "M") { e.preventDefault(); addMarker(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [addMarker]);
+  }, [addMarker, markObservation]);
 
   const elapsed = recorder ? (recorder.running ? Date.now() - recorder.startedAtUnixMs : recorder.elapsedMs) : 0;
+  const observing = Boolean(recording && recorder?.fusion.calibrated && recorder.fusion.receiving(elapsed) && audio.connection === "open");
   const liveBadge = !running ? <Chip tone="neutral">Input stopped</Chip>
     : source?.kind === "file" ? <Chip tone="info">File playback · not live</Chip>
     : <Chip tone="good">Live input</Chip>;
@@ -246,7 +260,7 @@ export default function App() {
           </div>
           {recording
             ? <button className="btn btn-stop" onClick={() => void stopSession()}>Stop session</button>
-            : <button className="btn btn-primary" disabled={audio.busy || audio.connection !== "open" || device === null}
+            : <button className="btn btn-primary" disabled={audio.busy || audio.connection !== "open" || (!running && device === null)}
                 onClick={() => void startSession()}>Start session</button>}
         </div>
       </section>
@@ -255,6 +269,28 @@ export default function App() {
         {source.hostapi ? ` · ${source.hostapi}` : ""}{source.anchor_method ? ` · clock anchor: ${source.anchor_method}` : ""}
         {source.overflows ? ` · ${source.overflows} overflows` : ""}</p>}
       {audio.error && <div className="banner-error" role="alert">{audio.error}</div>}
+
+      <section className="card" lang="es" aria-label="Experimento de Proyecto 2">
+        <header className="card-head"><h2>Proyecto 2 · Audio y movimiento</h2>
+          <Chip tone={observing ? "good" : "neutral"}>{recording && recorder
+            ? (audio.connection === "open" ? recorder.fusion.status(elapsed) : "Servicio desconectado")
+            : recorder ? "Sesión terminada" : "Sin sesión"}</Chip>
+        </header>
+        <p className="muted small">Conecta el micrófono de contacto y el MPU6050 e inicia una sesión.
+          Deja pasar los 3 segundos de preparación y mantén ambos en reposo durante los 5 segundos de calibración. El detector marca un candidato cuando los dos
+          superan sus umbrales con una diferencia de hasta 0.65 s. Registra cada acción realizada con su botón o tecla.</p>
+        <div className="row" role="group" aria-label="Marcar una observación">
+          {PRACTICE_ACTIONS.map(action => <button key={action.key} className="btn btn-sm"
+            disabled={!observing} onClick={() => markObservation(action.category)}><kbd>{action.key}</kbd> {action.title}</button>)}
+        </div>
+        {recording && audio.latest && audio.latest.features.raw_rms === undefined &&
+          <p role="status" className="muted small">Actualiza el servicio de audio de esta rama para recibir el RMS de Proyecto 2.</p>}
+        {recorder && <p className="muted small">Candidatos por coincidencia: {recorder.experiment.candidates.length}
+          {" · "}Observaciones manuales: {recorder.experiment.marks.length}</p>}
+        {recorder && !recording && <button className="btn btn-sm" onClick={() =>
+          downloadExperiment(recorder.experiment, recorder.source?.kind === "file" ? "file" : "device")}>
+          Descargar informe del experimento (.zip)</button>}
+      </section>
 
       <div className="grid-main">
         <section className="card span-live">

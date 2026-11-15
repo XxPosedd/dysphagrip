@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import socket
 import threading
 import time
@@ -31,11 +32,31 @@ ARDUINO_VIDS = {0x2341, 0x2A03, 0x1B4F}  # Arduino SA / Arduino.org / SparkFun (
 
 # --------------------------------------------------------------------------- parsing
 
+_NUMBER = r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+_PROJECT2_LINE = re.compile(
+    rf"Tilt X:\s*{_NUMBER}\s+Y:\s*{_NUMBER}\s+Z:\s*{_NUMBER}\s*\|\s*"
+    rf"Turn X:\s*{_NUMBER}\s+Y:\s*{_NUMBER}\s+Z:\s*{_NUMBER}"
+    r"(?:\s+seq=(\d+)\s+t_ms=(\d+))?"
+)
+
+
 def parse_line(raw: bytes | str) -> dict | None:
-    """Parse one NDJSON line from the firmware. Returns None for anything malformed."""
+    """Parse a firmware NDJSON frame or a Proyecto 2 Tilt/Turn line. Returns None for anything malformed."""
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8", errors="replace")
     raw = raw.strip()
+    if raw.startswith("Tilt X:"):
+        match = _PROJECT2_LINE.fullmatch(raw)
+        if match is None:
+            return None
+        axes = dict(zip(IMU_FIELDS, map(float, match.groups()[:6])))
+        if not all(math.isfinite(v) for v in axes.values()):
+            return None
+        seq, millis = match.groups()[6:]
+        if seq is not None and (len(seq) > 10 or len(millis) > 10):
+            return None
+        return {"type": "imu", "seq": int(seq) if seq else None,
+                "t_ms": int(millis) if millis else None, **axes}
     if not raw.startswith("{"):
         return None
     try:
@@ -48,6 +69,8 @@ def parse_line(raw: bytes | str) -> dict | None:
     if kind == "imu":
         try:
             out = {"type": "imu", "seq": int(msg["seq"]), "t_ms": float(msg["t_ms"])}
+            if not math.isfinite(out["t_ms"]):
+                return None
             for k in IMU_FIELDS:
                 v = float(msg[k])
                 if not math.isfinite(v):
@@ -56,7 +79,7 @@ def parse_line(raw: bytes | str) -> dict | None:
             if "temp_c" in msg:
                 out["temp_c"] = float(msg["temp_c"])
             return out
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OverflowError):
             return None
     if kind in ("hello", "error"):
         return msg
@@ -256,7 +279,7 @@ class SerialLineSource(LineSource):
             self.connected, self.last_error = True, None
             while not self._stop.is_set():
                 line = ser.readline()
-                if line:
+                if line.endswith(b"\n"):
                     self.on_line(line, time.time_ns())
 
     def _close(self) -> None:
@@ -345,6 +368,7 @@ class MotionStream:
         self.samples_total = 0
         self.seq_gaps = 0
         self.parse_errors = 0
+        self.timestamp_source: str | None = None
         self._last_seq: int | None = None
         self._last_t: float | None = None
         self._last_sample_host_ns: int | None = None
@@ -371,11 +395,18 @@ class MotionStream:
             self.device_errors.append(str(msg.get("msg", "unknown device error"))[:200])
             return
         host_ms = host_ns / 1e6
-        self.sync.observe(msg["t_ms"], host_ms)
-        if self._last_seq is not None and msg["seq"] > self._last_seq + 1:
+        if msg["t_ms"] is None:
+            self.timestamp_source = "host_arrival"
+            t = host_ms
+        else:
+            if self.timestamp_source == "host_arrival":
+                self.sync.reset()
+            self.timestamp_source = "board"
+            self.sync.observe(msg["t_ms"], host_ms)
+            t = self.sync.to_host_ms(msg["t_ms"])
+        if msg["seq"] is not None and self._last_seq is not None and msg["seq"] > self._last_seq + 1:
             self.seq_gaps += msg["seq"] - self._last_seq - 1
         self._last_seq = msg["seq"]
-        t = self.sync.to_host_ms(msg["t_ms"])
         # When a faster-arriving sample lowers the offset estimate, mapped times shift slightly earlier.
         # Keep the output strictly increasing so the timeline and detector never see time go backwards.
         if self._last_t is not None and t <= self._last_t:
@@ -427,6 +458,7 @@ class MotionStream:
             "samples_total": self.samples_total,
             "seq_gaps": self.seq_gaps,
             "parse_errors": self.parse_errors,
+            "timestamp_source": self.timestamp_source,
             "sync": {**self.sync.stats(), "board_resets": self.sync.resets},
             "config": self.detector.cfg.to_dict(),
         }

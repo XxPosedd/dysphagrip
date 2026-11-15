@@ -138,11 +138,11 @@ export function MotionPanel({ status, latest, ports, error, subscribe, onStart, 
           </div>
           {f?.interference && <p className="notice-inline"><Chip tone="warning">Movement interference</Chip> audio from this moment may be affected</p>}
           <p className="muted small tabular">
-            {status?.device?.device ?? "device ?"} {status?.device?.whoami ? `(WHO_AM_I ${status.device.whoami})` : ""} ·{" "}
-            {status?.device?.rate_hz ?? "?"} Hz · {status?.source} ·{" "}
-            {status?.sync?.offset_ms != null ? "clock synced to this computer" : "syncing clock…"}
-            {status?.sync?.jitter_p95_ms != null ? ` · arrival jitter p95 ${status.sync.jitter_p95_ms} ms` : ""}
-            {status?.sync?.drift_ppm != null ? ` · drift ${status.sync.drift_ppm} ppm` : ""}
+            {status?.device?.device ?? "MPU-6050"} {status?.device?.whoami ? `(WHO_AM_I ${status.device.whoami})` : ""} ·{" "}
+            {status?.device?.rate_hz ? `${status.device.rate_hz} Hz · ` : ""}{status?.source} ·{" "}
+            {status?.timestamp_source === "host_arrival" ? "computer arrival time (no board clock)" : status?.sync?.offset_ms != null ? "clock synced to this computer" : "syncing clock…"}
+            {status?.timestamp_source !== "host_arrival" && status?.sync?.jitter_p95_ms != null ? ` · arrival jitter p95 ${status.sync.jitter_p95_ms} ms` : ""}
+            {status?.timestamp_source !== "host_arrival" && status?.sync?.drift_ppm != null ? ` · drift ${status.sync.drift_ppm} ppm` : ""}
             {status?.seq_gaps ? ` · ${status.seq_gaps} samples lost` : ""}
           </p>
         </>

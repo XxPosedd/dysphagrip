@@ -1,0 +1,21 @@
+.lab { max-width: 1136px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px); }
+.lab-header, .lab-header nav { display: flex; align-items: center; flex-wrap: wrap; }
+.lab-header { justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 18px 0; }
+.lab-brand { font-size: 20px; font-weight: 750; letter-spacing: -.05em; }
+.lab-header nav { gap: 18px; }
+.lab a, .monitor-return a { color: var(--text-secondary); text-underline-offset: 4px; }
+.lab-header a { font-size: 13px; }
+.lab-header a:hover, .monitor-return a:hover { color: var(--accent); }
+.lab-main { display: grid; gap: 22px; }
+.lab-intro { padding: clamp(20px, 4vw, 44px) 0 0; }
+.lab-project { font: 650 12px ui-monospace, monospace; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .09em; }
+.lab-intro h1 { font-size: clamp(32px, 5.5vw, 64px); letter-spacing: -.055em; line-height: 1.1; margin: 8px 0 12px; }
+.lab-intro p { max-width: 68ch; color: var(--text-secondary); font-size: 16px; }
+.lab-main > section { min-width: 0; scroll-margin-top: 12px; }
+.lab-reference { padding: 14px 0; border-block: 1px solid var(--border); }
+.lab-reference summary { font-weight: 600; cursor: pointer; }
+.lab-reference figure { margin: 16px 0 0; }
+.lab-reference img { width: 100%; height: auto; border-radius: 8px; }
+.lab-reference figcaption, .lab-footer { font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.lab-footer { padding: 18px 0 36px; }
+.monitor-return { max-width: 1320px; margin: 12px auto 0; padding: 0 20px; font-size: 13px; }

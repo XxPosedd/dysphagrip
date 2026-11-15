@@ -31,12 +31,18 @@ CREATE INDEX IF NOT EXISTS recording_sessions_started_at_idx ON recording_sessio
 CREATE TABLE IF NOT EXISTS session_markers (
   id           BIGSERIAL PRIMARY KEY,
   session_id   UUID NOT NULL REFERENCES recording_sessions(id) ON DELETE CASCADE,
-  kind         TEXT NOT NULL CHECK (kind IN ('manual', 'audio_activity', 'quality', 'movement_interference')),
+  kind         TEXT NOT NULL,
   t_ms         INTEGER NOT NULL CHECK (t_ms >= 0),
   duration_ms  INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
   label        TEXT NOT NULL CHECK (char_length(label) <= 80),
   note         TEXT CHECK (note IS NULL OR char_length(note) <= 280)
 );
+
+-- Upgrade the generated constraint on existing installations as well as new databases.
+ALTER TABLE session_markers
+  DROP CONSTRAINT IF EXISTS session_markers_kind_check,
+  ADD CONSTRAINT session_markers_kind_check CHECK (kind IN
+    ('manual', 'audio_activity', 'quality', 'movement_interference', 'possible_swallow_event'));
 
 CREATE INDEX IF NOT EXISTS session_markers_session_idx ON session_markers (session_id, t_ms);
 

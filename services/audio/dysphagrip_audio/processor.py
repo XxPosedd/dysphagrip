@@ -72,6 +72,7 @@ class FrameProcessor:
             "spectrum": {"fmax_hz": min(cfg.spec_fmax_hz, fs / 2), "db": [_r(v, 1) for v in column]},
             "features": {
                 "rms_dbfs": _r(level_db, 1),
+                "raw_rms": dsp.rms(raw),  # Unfiltered linear RMS for Proyecto 2 fusion.
                 "peak": _r(dsp.peak(raw), 4),
                 "clip_fraction": _r(clipped, 5),
                 "zcr": _r(dsp.zero_crossing_rate(x), 4),

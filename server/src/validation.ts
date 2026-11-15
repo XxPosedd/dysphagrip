@@ -2,7 +2,7 @@
 // unknown marker kinds, non-finite numbers, oversized strings and impossible times are rejected.
 
 export const QUALITY_LABELS = ["ok", "no_signal", "clipping", "mains_hum"] as const;
-export const MARKER_KINDS = ["manual", "audio_activity", "quality", "movement_interference"] as const;
+export const MARKER_KINDS = ["manual", "audio_activity", "quality", "movement_interference", "possible_swallow_event"] as const;
 export type QualityLabel = (typeof QUALITY_LABELS)[number];
 export type MarkerKind = (typeof MARKER_KINDS)[number];
 

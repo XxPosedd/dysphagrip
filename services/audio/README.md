@@ -1,7 +1,8 @@
-# DysphaGrip audio service (Python)
+# DysphaGrip multimodal signal service (Python)
 
-Captures one channel from an audio input (target: **KORG CM-300 → Behringer UM2 → MacBook**),
-computes signal features and streams them over WebSocket to the dashboard.
+Captures one channel from a USB audio input (contact pickup → M-Audio / Focusrite / UM2 → MacBook),
+optionally fuses MPU-6050 IMU samples from an Arduino UNO Q, runs experimental event heuristics,
+and streams multimodal frames over WebSocket (`/stream` audio-only, `/ws/live` fused).
 
 > Experimental engineering prototype. Features describe the *audio signal* (level, spectrum,
 > hum, clipping, activity above the noise floor). They are not clinical measurements and do
@@ -32,8 +33,16 @@ python -m dysphagrip_audio serve --wav recording.wav   # FILE PLAYBACK: frames l
 python -m dysphagrip_audio serve --silence-dbfs -85     # tune the no_signal threshold for your microphone
 ```
 
+Multimodal control (also used by the V2 dashboard):
+
+```bash
+curl -X POST http://127.0.0.1:8765/api/mode -H 'Content-Type: application/json' -d '{"mode":"demo"}'
+curl -X POST http://127.0.0.1:8765/api/sessions/start -H 'Content-Type: application/json' -d '{}'
+# Live WS: ws://127.0.0.1:8765/ws/live
+```
+
 Open **http://127.0.0.1:8765/** for the standalone diagnostic viewer (waveform, spectrogram,
-features, quality). The React dashboard (Phase 5) consumes the same WebSocket.
+features, quality). The React dashboard consumes `/stream` and `/ws/live` via the Vite `/audio` proxy.
 
 `--device` accepts a device index, a name substring, `um2` (auto-detect) or nothing (system default).
 `--channel` is 0-based: on the UM2, `0` = input 1 (XLR/TRS combo), `1` = input 2 (instrument, Hi-Z).

@@ -83,7 +83,10 @@ def cmd_serve(args) -> int:
     app = create_app(cfg, default_source_factory(args.wav), autostart=autostart)
     if args.wav:
         print(f"FILE PLAYBACK MODE: streaming '{args.wav}' (frames are labelled source='file', not live).")
+    if getattr(args, "demo", False):
+        print("Demo Mode available via POST /api/mode {\"mode\":\"demo\"} — banner will show SIMULATED DEMO DATA.")
     print(f"Viewer: http://{args.host}:{args.port}/")
+    print(f"Live WS: ws://{args.host}:{args.port}/ws/live")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
 
@@ -111,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
     sv.add_argument("--silence-dbfs", type=float, default=AudioConfig.silence_dbfs,
                     help="RMS level below which quality is 'no_signal' (calibrate per microphone)")
     sv.add_argument("--wav", default=None, help="replay a WAV file instead of a device (labelled 'file')")
+    sv.add_argument("--demo", action="store_true",
+                    help="start the multimodal service ready for Demo Mode (no hardware required)")
     sv.set_defaults(fn=cmd_serve)
 
     args = p.parse_args(argv)

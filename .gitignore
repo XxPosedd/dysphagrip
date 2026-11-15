@@ -17,3 +17,6 @@ __pycache__/
 *.wav
 recordings/
 .neon
+
+# Local multimodal session DB
+services/audio/data/

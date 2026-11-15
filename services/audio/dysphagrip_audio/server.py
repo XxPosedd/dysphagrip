@@ -68,6 +68,17 @@ class AudioService:
         self.last_error: str | None = None
         self._task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
+        # Optional in-process listeners (e.g. MonitorHub) receive the same frames as WS clients.
+        self._frame_listeners: list = []
+        self._latest_frame: dict | None = None
+
+    def add_frame_listener(self, fn) -> Callable[[], None]:
+        self._frame_listeners.append(fn)
+        return lambda: self._frame_listeners.remove(fn) if fn in self._frame_listeners else None
+
+    @property
+    def latest_frame(self) -> dict | None:
+        return self._latest_frame
 
     @property
     def running(self) -> bool:
@@ -134,6 +145,12 @@ class AudioService:
             frame = self.processor.process() if self.processor else None
             if frame is not None:
                 idle = 0.0
+                self._latest_frame = frame
+                for fn in list(self._frame_listeners):
+                    try:
+                        fn(frame)
+                    except Exception:  # noqa: BLE001
+                        pass
                 await self.broadcast(frame)
                 continue
             idle += hop
@@ -166,12 +183,31 @@ class AudioService:
             self.clients.discard(ws)
 
 
+class ModeRequest(BaseModel):
+    mode: str  # live | demo
+
+
+class ImuConnectRequest(BaseModel):
+    transport: str  # serial | tcp
+    port: str | None = None
+    host: str = "192.168.1.1"
+    tcp_port: int = 9001
+    baud: int = 115200
+
+
+class SessionStartRequest(BaseModel):
+    label: str | None = None
+
+
 def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | None = None,
                autostart: StartRequest | None = None, allowed_origins: list[str] | None = None,
                device_lister: Callable[[], list[dict]] = list_input_devices) -> FastAPI:
     cfg = cfg or AudioConfig()
     service = AudioService(cfg, source_factory or default_source_factory())
     origins = allowed_origins or DEFAULT_ORIGINS
+
+    from .monitor import MonitorHub
+    monitor = MonitorHub(service, cfg)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -182,16 +218,30 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
                 service.last_error = f"Autostart failed: {exc}"
                 log.error(service.last_error)
         yield
+        if monitor.monitoring:
+            await monitor.stop_monitoring(save=False)
+        monitor.imu.stop()
         await service.stop()
 
-    app = FastAPI(title="DysphaGrip audio service", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="DysphaGrip multimodal service", version="0.2.0", lifespan=lifespan)
     app.state.service = service
-    app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"],
+    app.state.monitor = monitor
+    app.add_middleware(CORSMiddleware, allow_origins=origins,
+                       allow_methods=["GET", "POST", "DELETE"],
                        allow_headers=["Content-Type"])
 
     @app.get("/health")
     async def health():
-        return {"ok": True, "service": "dysphagrip-audio", "running": service.running}
+        return {
+            "ok": True,
+            "service": "dysphagrip-audio",
+            "running": service.running,
+            **{k: v for k, v in monitor.health().items() if k not in ("ok", "service")},
+        }
+
+    @app.get("/api/health")
+    async def api_health():
+        return monitor.health()
 
     @app.get("/devices")
     async def devices():
@@ -199,13 +249,33 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
             devs = await asyncio.to_thread(device_lister)
         except Exception as exc:  # noqa: BLE001 -- e.g. PortAudio missing
             raise HTTPException(503, f"Could not query audio devices: {exc}") from exc
-        from .devices import find_um2
+        from .devices import find_um2, find_usb_audio_interface
         um2 = find_um2(devs)
-        return {"devices": devs, "um2_candidate": um2["index"] if um2 else None}
+        usb = find_usb_audio_interface(devs)
+        return {
+            "devices": devs,
+            "um2_candidate": um2["index"] if um2 else None,
+            "usb_audio_candidate": usb["index"] if usb else None,
+        }
+
+    @app.get("/api/devices")
+    async def api_devices():
+        try:
+            devs = await asyncio.to_thread(device_lister)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(503, f"Could not query audio devices: {exc}") from exc
+        from .devices import find_um2, find_usb_audio_interface
+        um2 = find_um2(devs)
+        usb = find_usb_audio_interface(devs)
+        return monitor.devices_bundle(
+            devs,
+            um2["index"] if um2 else None,
+            usb["index"] if usb else None,
+        )
 
     @app.get("/status")
     async def status():
-        return service.status()
+        return {**service.status(), "monitor": monitor.live_snapshot()}
 
     @app.post("/start")
     async def start(req: StartRequest):
@@ -225,6 +295,81 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
     async def stop():
         return await service.stop()
 
+    @app.post("/api/mode")
+    async def set_mode(req: ModeRequest):
+        try:
+            return await monitor.set_mode(req.mode)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/imu/connect")
+    async def imu_connect(req: ImuConnectRequest):
+        try:
+            return await monitor.connect_imu(
+                transport=req.transport, port=req.port, host=req.host,
+                tcp_port=req.tcp_port, baud=req.baud,
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/imu/disconnect")
+    async def imu_disconnect():
+        return await monitor.disconnect_imu()
+
+    @app.post("/api/sessions/start")
+    async def sessions_start(req: SessionStartRequest = SessionStartRequest()):
+        try:
+            return await monitor.start_monitoring(label=req.label)
+        except RuntimeError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/sessions/stop")
+    async def sessions_stop():
+        return await monitor.stop_monitoring(save=True)
+
+    @app.post("/api/sessions/reset")
+    async def sessions_reset():
+        return await monitor.reset_session()
+
+    @app.post("/api/calibration")
+    async def calibration_start():
+        return await monitor.start_calibration()
+
+    @app.get("/api/calibration")
+    async def calibration_status():
+        return monitor.calibrator.progress()
+
+    @app.get("/api/sessions")
+    async def sessions_list():
+        return {"sessions": monitor.store.list()}
+
+    @app.get("/api/sessions/{session_id}")
+    async def sessions_get(session_id: str):
+        row = monitor.store.get(session_id)
+        if not row:
+            raise HTTPException(404, "Session not found")
+        return row
+
+    @app.get("/api/sessions/{session_id}/export")
+    async def sessions_export(session_id: str, format: str = "json"):
+        from fastapi.responses import Response
+        exported = monitor.store.export(session_id, fmt=format)
+        if not exported:
+            raise HTTPException(404, "Session not found")
+        body, media = exported
+        ext = "csv" if format == "csv" else "json"
+        return Response(
+            content=body,
+            media_type=media,
+            headers={"Content-Disposition": f'attachment; filename="dysphagrip-{session_id}.{ext}"'},
+        )
+
+    @app.delete("/api/sessions/{session_id}")
+    async def sessions_delete(session_id: str):
+        if not monitor.store.delete(session_id):
+            raise HTTPException(404, "Session not found")
+        return {"ok": True}
+
     @app.websocket("/stream")
     async def stream(ws: WebSocket):
         origin = ws.headers.get("origin")
@@ -241,6 +386,27 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
             pass
         finally:
             service.clients.discard(ws)
+
+    @app.websocket("/ws/live")
+    async def ws_live(ws: WebSocket):
+        origin = ws.headers.get("origin")
+        if origin and origin not in origins:
+            await ws.close(code=1008)
+            return
+        await ws.accept()
+        monitor.clients.add(ws)
+        await ws.send_text(json.dumps({
+            "type": "hello",
+            **monitor.health(),
+            "session": monitor.live_snapshot(),
+        }, separators=(",", ":")))
+        try:
+            while True:
+                await ws.receive_text()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            monitor.clients.discard(ws)
 
     @app.get("/")
     async def viewer():

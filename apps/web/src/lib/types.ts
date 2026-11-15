@@ -70,6 +70,7 @@ export interface AudioDevice {
   default_samplerate: number;
   is_default: boolean;
   um2_match: "strong" | "possible" | null;
+  usb_audio_match?: "strong" | "possible" | null;
 }
 
 export type MarkerKind = "manual" | "audio_activity" | "quality";

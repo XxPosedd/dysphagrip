@@ -1,6 +1,26 @@
-# Audio hardware: KORG CM-300 → Behringer U-PHORIA UM2 → MacBook
+# Audio hardware: contact pickup → USB interface → MacBook
+
+The acquisition layer is **device-agnostic**. Supported demos include:
+
+- Cherub WCP-55 → M-Audio AIR 192|6
+- KORG CM-300 → Behringer U-PHORIA UM2
+- Equivalent contact pickup → Focusrite Scarlett 2i2
+
+Select the USB input at runtime in the dashboard or via `python -m dysphagrip_audio devices`.
 
 ## Signal chain
+
+```text
+Contact pickup (e.g. Cherub WCP-55 / KORG CM-300)
+        │  6.35 mm (1/4") instrument cable
+        ▼
+USB audio interface Hi-Z / INST input  (phantom power OFF)
+        │  USB
+        ▼
+MacBook ──► services/audio (sounddevice)
+```
+
+### Example: KORG CM-300 → Behringer UM2
 
 ```text
 KORG CM-300 contact pickup ──(1/4" mono cable)──► UM2 INPUT 2 (INST, Hi-Z)

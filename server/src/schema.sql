@@ -48,10 +48,20 @@ CREATE TABLE IF NOT EXISTS session_quality (
   PRIMARY KEY (session_id, quality)
 );
 
--- Public-interest resources (Bright Data, Phase 8). Source URL and retrieval time are mandatory.
+-- Public-interest resources (Bright Data / MedlinePlus). Source URL, publisher, licence and retrieval time are mandatory
+-- for display; see server/src/resources/sources.ts for how each source was vetted.
 CREATE TABLE IF NOT EXISTS public_resources (
   id            BIGSERIAL PRIMARY KEY,
   title         TEXT NOT NULL,
   source_url    TEXT NOT NULL,
   retrieved_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public_resources ADD COLUMN IF NOT EXISTS summary             TEXT;
+ALTER TABLE public_resources ADD COLUMN IF NOT EXISTS publisher           TEXT;
+ALTER TABLE public_resources ADD COLUMN IF NOT EXISTS language            TEXT NOT NULL DEFAULT 'en';
+ALTER TABLE public_resources ADD COLUMN IF NOT EXISTS collected_via       TEXT;
+ALTER TABLE public_resources ADD COLUMN IF NOT EXISTS license_note        TEXT;
+ALTER TABLE public_resources ADD COLUMN IF NOT EXISTS source_last_updated TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS public_resources_source_url_key ON public_resources (source_url);

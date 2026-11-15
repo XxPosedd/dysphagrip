@@ -10,7 +10,8 @@
     "test": "npm run test --prefix server && npm run test --prefix apps/web",
     "start": "npm run start --prefix server",
     "db:migrate": "npm run db:migrate --prefix server",
-    "test:db": "npm run test:db --prefix server"
+    "test:db": "npm run test:db --prefix server",
+    "resources:refresh": "npm run resources:refresh --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

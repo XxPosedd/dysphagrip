@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ResourcesPanel } from "./components/Resources";
 import { Spectrogram } from "./components/Spectrogram";
 import { Timeline } from "./components/Timeline";
 import { Waveform } from "./components/Waveform";
@@ -188,7 +189,7 @@ export default function App() {
                 title={db === "not_configured" ? "Set DATABASE_URL in .env" : db === "unreachable" ? "DATABASE_URL is set but Neon did not respond" : "Connected"}>
                 {db === "unreachable" ? "Neon unreachable" : "Neon"}</Chip>}
           {integ(health?.integrations.elevenlabs, "ElevenLabs", "set ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID")}
-          {integ(health?.integrations.brightdata, "Bright Data", "Phase 8")}
+          {integ(health?.integrations.brightdata, "Bright Data", "set BRIGHTDATA_API_TOKEN and BRIGHTDATA_ZONE")}
         </div>
       </header>
 
@@ -267,6 +268,8 @@ export default function App() {
       <SessionHistory local={localSessions} remote={remoteSessions} remoteError={remoteError} db={db}
         onRefresh={() => { void loadHealth(); if (db === "ok") void loadSessions(); }}
         onRetry={retrySave} onDelete={deleteRemote} />
+
+      <ResourcesPanel brightDataConfigured={health?.integrations.brightdata ?? false} />
 
       <footer className="muted small">Raw audio never leaves this computer: the browser receives only waveform envelopes,
         spectrogram columns and signal features from the local audio service.</footer>

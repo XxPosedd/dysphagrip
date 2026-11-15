@@ -220,3 +220,12 @@ footer { text-align: center; padding-top: 8px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .markers.compact { max-height: 200px; margin-top: 8px; }
 code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- Public resources ---------- */
+.resources { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.resource { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.resource p { font-size: 13px; color: var(--text-secondary); }
+.resource-title { font-weight: 650; color: var(--text-primary); text-decoration: none; }
+.resource-title:hover, .resource-title:focus-visible { text-decoration: underline; color: var(--accent); }
+.resource-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-muted); margin-top: auto; }
+.via { font-weight: 600; color: var(--text-secondary); }

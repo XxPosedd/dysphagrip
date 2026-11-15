@@ -15,7 +15,7 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 | Track | Contribution | Status |
 |---|---|---|
 | Best Overall Hack | End-to-end live audio + motion capture, synchronised dashboard, signal quality, history | Audio service ✅ · dashboard ✅ (audio) · motion 🚧 |
-| Bright Data: Data for Good | Attributed public-interest swallowing/dysphagia resources with source URL + retrieval time | 🚧 Phase 8 |
+| Bright Data: Data for Good | Attributed US public-domain swallowing resources (NIH NIDCD via Bright Data Web Unlocker; MedlinePlus EN/ES via official API) with source, publisher, licence and retrieval date | ✅ Built and tested · MedlinePlus live · NIDCD collection pending Bright Data token |
 | ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Live: voice "Matilda", spoken cues verified in the dashboard |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
@@ -112,6 +112,27 @@ signal detected/lost, clipping, hum, motion connected/lost, movement interferenc
 so the endpoint cannot be used to spend your quota, and it never produces medical advice. Each phrase is synthesised once
 and then served from memory. Every announcement is also shown as text (🔊 spoken / 💬 text only).
 
+## Bright Data: public-interest resources (US)
+
+The dashboard's **Swallowing support resources (US)** panel lists public, attributed information from U.S. government
+health sources: links to the publishers, never advice from DysphaGrip.
+
+| Source | How it is collected | Why |
+|---|---|---|
+| NIH NIDCD: *Dysphagia*, *Swallowing Disorders*, *Nearly 1 in 12 children… swallowing* | **Bright Data Web Unlocker API** | Public domain; robots.txt allows it; no API exists |
+| MedlinePlus: *Swallowing Disorders* (EN) and *Problemas para tragar* (ES) | MedlinePlus **official web service** | Public domain; an official API exists, so scraping would be wrong |
+
+Rejected while vetting (see `server/src/resources/sources.ts`): ASHA (terms forbid scrapers), the Swallowing Disorder
+Foundation (blocks automated requests), the Dysphagia Research Society (bot challenge; we never bypass one), and pages whose
+official description gives intervention advice or that have no description to quote.
+
+Setup:
+1. In Bright Data's control panel create a **Web Unlocker API** zone; its *Overview* tab shows the API key and zone name.
+2. Add `BRIGHTDATA_API_TOKEN=…` and `BRIGHTDATA_ZONE=…` to `.env`.
+3. Run `npm run resources:refresh`. It collects every source (2 s between pages), stores them in Neon with source URL,
+   publisher, language, collection method, licence note, source date and retrieval time, and reports any failures per
+   source. It is a CLI script on purpose, so nobody can spend your Bright Data credits through the website.
+
 ## Neon (database)
 
 1. **Easiest:** with the Neon CLI (`npm i -g neon`), run `neon login`, then in the repo root
@@ -170,7 +191,7 @@ the Express server only. Anything prefixed `VITE_` is shipped to the browser and
 - `GET /api/voice`: voice configuration (configured, model, voice name) and the approved phrase list
 - `POST /api/voice/status` `{message}`: speak one **approved** phrase via ElevenLabs and return MP3. 400 for any
   other text, 501 not configured, 429 local rate limit (30 uncached calls/min), 502/503/504 mapped ElevenLabs errors
-- `GET /api/resources`: public resources (empty until Phase 8)
+- `GET /api/resources`: attributed public resources stored in Neon (collected offline by `npm run resources:refresh`; there is deliberately no HTTP endpoint that triggers collection)
 
 The audio service API and WebSocket contract are documented in [services/audio/README.md](services/audio/README.md).
 
@@ -183,7 +204,7 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [x] Phase 5: React dashboard (audio side live; motion panels wait for Phase 3)
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
 - [x] Phase 7: ElevenLabs (live: cues spoken in a real session; allowlisted phrases, caching, rate limit)
-- [ ] Phase 8: Bright Data
+- [x] Phase 8: Bright Data (live for MedlinePlus; NIDCD pages collect once `BRIGHTDATA_API_TOKEN` + `BRIGHTDATA_ZONE` are set)
 - [ ] Phase 9: deployment
 
 ## Repository

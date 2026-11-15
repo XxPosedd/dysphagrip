@@ -81,3 +81,21 @@
   text and labelled 💬, so the demo never implies ElevenLabs is speaking when it isn't.
 - **Autoplay**: the first cue ("Recording started.") follows the Start-session click, a user gesture, so browsers allow playback.
   If playback is blocked anyway, the panel says so.
+
+## Phase 8 (Bright Data)
+
+- **US public-domain sources only, vetted before collection** (2026-11-14): permission/licence, robots.txt, absence of bot
+  challenges, and no intervention advice in the official description. Rejected sources and reasons are recorded in
+  `server/src/resources/sources.ts`.
+- **Bright Data where it is the right tool, official APIs where they exist.** NIDCD pages have no API, so they go through
+  Bright Data's Web Unlocker API (`POST https://api.brightdata.com/request`, `format: raw`). MedlinePlus has an official
+  web service, so it is used directly. Each record states how it was collected.
+- **Never bypass protections.** The Bright Data client only accepts vetted hosts (`www.nidcd.nih.gov`), and any page that
+  comes back as a bot challenge is skipped and reported. We do not use Web Unlocker to get past a site's defences.
+- **No invented content.** Summaries are the publisher's own description or first paragraph, trimmed; a page with no
+  description is refused rather than summarised by us.
+- **Collection is a CLI job** (`npm run resources:refresh`), not an API route, to protect the Bright Data balance and keep
+  the public site read-only. Upserts are keyed on `source_url`.
+- **Attribution in the UI**: publisher, link, collection method, retrieval date, source date (when stated), licence note,
+  and a "not advice from DysphaGrip" notice. English and Spanish entries can be filtered.
+- Tests run against real saved pages (public domain), so the suite never spends Bright Data credits.

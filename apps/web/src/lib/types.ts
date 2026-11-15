@@ -148,6 +148,19 @@ export interface SessionPayload {
   markers: Array<{ kind: MarkerKind; t_ms: number; duration_ms: number | null; label: string; note: string | null }>;
 }
 
+/** Attributed public-interest resource (GET /api/resources). Mirrors server/src/resources/types.ts. */
+export interface PublicResource {
+  source_url: string;
+  title: string;
+  summary: string;
+  publisher: string;
+  language: "en" | "es";
+  collected_via: "bright_data_web_unlocker" | "medlineplus_api";
+  license_note: string;
+  source_last_updated: string | null;
+  retrieved_at: string;
+}
+
 export interface ApiHealth {
   ok: boolean;
   integrations: { database: boolean; elevenlabs: boolean; brightdata: boolean };

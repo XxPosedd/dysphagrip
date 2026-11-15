@@ -1,5 +1,5 @@
 import { API_BASE, AUDIO_HTTP_BASE } from "./config";
-import type { ApiHealth, AudioDevice, AudioStatus, SessionPayload, StoredMarker, StoredSession } from "./types";
+import type { ApiHealth, AudioDevice, AudioStatus, PublicResource, SessionPayload, StoredMarker, StoredSession } from "./types";
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -43,6 +43,7 @@ export const audioApi = {
 // ---- Express API ----
 export const api = {
   health: () => request<ApiHealth>(`${API_BASE}/api/health`),
+  resources: () => request<{ configured: boolean; resources: PublicResource[]; note?: string }>(`${API_BASE}/api/resources`),
   dbStatus: () => request<{ ok: boolean; latency_ms: number }>(`${API_BASE}/api/db/status`),
   sessions: () => request<{ sessions: StoredSession[] }>(`${API_BASE}/api/sessions`),
   session: (id: string) => request<{ session: StoredSession & { markers: StoredMarker[] } }>(`${API_BASE}/api/sessions/${encodeURIComponent(id)}`),

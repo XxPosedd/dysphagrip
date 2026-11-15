@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { storeFromEnv, type SessionStore } from "./db.js";
 import { RateLimiter, TtsError, ttsFromEnv, type TextToSpeech } from "./integrations/elevenlabs.js";
 import { VOICE_PHRASES, isAllowedPhrase } from "./voice/phrases.js";
+import { resourceStoreFromEnv, type ResourceStore } from "./resources/store.js";
 import { isUuid, parseSessionInput, ValidationError } from "./validation.js";
 
 export interface AppDeps {
@@ -14,6 +15,8 @@ export interface AppDeps {
   tts?: TextToSpeech;
   /** Max uncached ElevenLabs calls per minute (cached phrases are free). */
   ttsPerMinute?: number;
+  /** Public resources (read-only for the API). `undefined` -> from DATABASE_URL. */
+  resources?: ResourceStore | null;
 }
 
 /** Never echo connection strings back to clients or logs. */
@@ -25,6 +28,7 @@ export function createApp(deps: AppDeps = {}) {
   const store = deps.store === undefined ? storeFromEnv() : deps.store;
   const tts = deps.tts ?? ttsFromEnv();
   const ttsLimiter = new RateLimiter(deps.ttsPerMinute ?? 30, 60_000);
+  const resourceStore = deps.resources === undefined ? resourceStoreFromEnv() : deps.resources;
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: "2mb" }));
@@ -45,7 +49,7 @@ export function createApp(deps: AppDeps = {}) {
       integrations: {
         database: store !== null,
         elevenlabs: tts.configured,
-        brightdata: Boolean(process.env.BRIGHTDATA_API_TOKEN && process.env.BRIGHTDATA_DATASET_ID),
+        brightdata: Boolean(process.env.BRIGHTDATA_API_TOKEN?.trim() && process.env.BRIGHTDATA_ZONE?.trim()),
       },
     });
   });
@@ -151,9 +155,21 @@ export function createApp(deps: AppDeps = {}) {
     }
   });
 
-  // Bright Data is implemented in Phase 8. Until then this endpoint is honest about being empty.
-  app.get("/api/resources", (_req, res) => {
-    res.json({ source: "not_configured", resources: [], note: "Bright Data integration is not implemented yet (Phase 8)." });
+  // Attributed public-interest resources, collected offline by `npm run resources:refresh` (never on request).
+  app.get("/api/resources", async (_req, res) => {
+    if (!resourceStore) {
+      return void res.json({ resources: [], configured: false, note: "Neon is not configured, so no resources are stored." });
+    }
+    try {
+      const resources = await resourceStore.list();
+      res.json({
+        configured: true,
+        resources,
+        note: resources.length ? undefined : "No resources collected yet. Run: npm run resources:refresh",
+      });
+    } catch (error) {
+      dbFailure(res, error);
+    }
   });
 
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));

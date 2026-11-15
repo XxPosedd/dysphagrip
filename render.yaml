@@ -14,5 +14,5 @@ services:
         sync: false
       - key: BRIGHTDATA_API_TOKEN
         sync: false
-      - key: BRIGHTDATA_DATASET_ID
+      - key: BRIGHTDATA_ZONE
         sync: false

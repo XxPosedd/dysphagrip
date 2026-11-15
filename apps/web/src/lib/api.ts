@@ -7,29 +7,44 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, init);
   } catch {
     throw new ApiError("Service unreachable", 0);
   }
-  const body = await res.json().catch(() => ({}));
+  const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const detail = (body as { detail?: unknown; error?: unknown }).detail ?? (body as { error?: unknown }).error;
+    const detail = body?.detail ?? body?.error;
     if (typeof detail === "string") throw new ApiError(detail, res.status);
     // No JSON body: in development this is the Vite proxy reporting that the target server is down.
     if (res.status >= 500) throw new ApiError(`API server unreachable (HTTP ${res.status}). Is it running?`, res.status);
     throw new ApiError(res.statusText || `HTTP ${res.status}`, res.status);
   }
+  if (body === null) throw new ApiError("The service returned an invalid response.", res.status);
   return body as T;
 }
 
-const json = (body: unknown): RequestInit => ({
+export const json = (body: unknown): RequestInit => ({
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),
 });
+
+export async function statusClip(message: string) {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/voice/status`, json({ message }));
+  } catch {
+    throw new ApiError("API unreachable", 0);
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError((body as { error?: string }).error || `HTTP ${res.status}`, res.status);
+  }
+  return { blob: await res.blob(), provider: res.headers.get("x-voice-provider") };
+}
 
 // ---- Python audio service ----
 export const audioApi = {
@@ -64,18 +79,5 @@ export const api = {
     }
   },
   voice: () => request<{ configured: boolean; model_id: string | null; voice: { id: string; name: string | null } | null }>(`${API_BASE}/api/voice`),
-  /** Returns an audio Blob, or throws ApiError(501) when ElevenLabs is not configured. */
-  async speak(message: string): Promise<Blob> {
-    let res: Response;
-    try {
-      res = await fetch(`${API_BASE}/api/voice/status`, json({ message }));
-    } catch {
-      throw new ApiError("API unreachable", 0);
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new ApiError((body as { error?: string }).error || `HTTP ${res.status}`, res.status);
-    }
-    return res.blob();
-  },
+  speak: async (message: string) => (await statusClip(message)).blob,
 };

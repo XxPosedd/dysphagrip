@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Laboratorio from "./Laboratorio";
+import LiveMonitor from "./LiveMonitor";
+const Laboratorio = React.lazy(() => import("./Laboratorio"));
 import "./styles.css";
 
 const Monitor = React.lazy(() => import("./App"));
@@ -28,17 +29,23 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
 }
 
-const monitor = new URLSearchParams(window.location.search).get("vista") === "monitor";
-document.documentElement.lang = monitor ? "en" : "es";
-document.title = monitor ? "DysphaGrip · Live monitor" : "Proyecto 2 · DysphaGrip";
+const view = new URLSearchParams(window.location.search).get("vista");
+const workstation = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+const instruments = view === "instrumentos" || (!workstation && view === "monitor");
+const oldLab = view === "laboratorio" || (!instruments && !workstation) ||
+  (!view && ["#practica", "#sesiones"].includes(location.hash));
+document.documentElement.lang = oldLab ? "es" : "en";
+document.title = oldLab ? "Proyecto 2 · DysphaGrip" : "DysphaGrip · Live monitor";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      {monitor ? <>
-        <nav className="monitor-return"><a href="?">← Laboratorio de Proyecto 2</a></nav>
-        <React.Suspense fallback={<p role="status" className="app">Abriendo monitor…</p>}><Monitor /></React.Suspense>
-      </> : <Laboratorio />}
+      <React.Suspense fallback={<p className="app" role="status">Loading…</p>}>
+        {oldLab ? <Laboratorio /> : instruments ? <>
+          <nav className="monitor-return"><a href={workstation ? "?vista=laboratorio" : "?"}>← Laboratorio de Proyecto 2</a></nav>
+          <Monitor />
+        </> : <LiveMonitor />}
+      </React.Suspense>
     </ErrorBoundary>
   </React.StrictMode>,
 );

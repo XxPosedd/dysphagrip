@@ -1,10 +1,16 @@
 import express, { type Response } from "express";
 import cors from "cors";
 import path from "node:path";
+import { homedir } from "node:os";
+import { mountLocalMonitor } from "./localMonitorProxy.js";
 import { fileURLToPath } from "node:url";
 import { storeFromEnv, type SessionStore } from "./db.js";
 import { RateLimiter, TtsError, ttsFromEnv, type TextToSpeech } from "./integrations/elevenlabs.js";
 import { VOICE_PHRASES, isAllowedPhrase } from "./voice/phrases.js";
+import { brightDataFromEnv, type BrightDataClient } from "./integrations/brightdata.js";
+import { monitorHistoryRouter, NeonMonitorHistory, type MonitorHistoryStore } from "./monitorHistory.js";
+import { createConditionReader } from "./resources/condition.js";
+import { createResearchReader } from "./resources/research.js";
 import { resourceStoreFromEnv, type ResourceStore } from "./resources/store.js";
 import { isUuid, parseSessionInput, ValidationError } from "./validation.js";
 
@@ -17,6 +23,9 @@ export interface AppDeps {
   ttsPerMinute?: number;
   /** Public resources (read-only for the API). `undefined` -> from DATABASE_URL. */
   resources?: ResourceStore | null;
+  monitorHistoryStore?: MonitorHistoryStore | null;
+  conditionBrightData?: Pick<BrightDataClient, "fetchPage"> | null;
+  researchBrightData?: Pick<BrightDataClient, "fetchPage"> | null;
 }
 
 /** Never echo connection strings back to clients or logs. */
@@ -29,9 +38,39 @@ export function createApp(deps: AppDeps = {}) {
   const tts = deps.tts ?? ttsFromEnv();
   const ttsLimiter = new RateLimiter(deps.ttsPerMinute ?? 30, 60_000);
   const resourceStore = deps.resources === undefined ? resourceStoreFromEnv() : deps.resources;
+  const readResearch = createResearchReader(deps.researchBrightData === undefined
+    ? brightDataFromEnv({ allowedHosts: new Set(["api.crossref.org"]), timeoutMs: 6000 })
+    : deps.researchBrightData);
+  const conditionCache = deps.conditionBrightData === undefined && process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1"
+    ? path.join(homedir(), "Library", "Application Support", "DysphaGrip", "condition-source.json") : undefined;
+  const readCondition = createConditionReader(deps.conditionBrightData === undefined
+    ? brightDataFromEnv({ allowedHosts: new Set(["www.parkinson.org"]), timeoutMs: 12000 })
+    : deps.conditionBrightData, Date.now, conditionCache);
   const app = express();
-  app.use(cors());
+  const localMode = process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1";
+  if (localMode) {
+    app.use((req, res, next) => {
+      const local = (host: string) => ["127.0.0.1", "localhost", "[::1]"].includes(host);
+      try {
+        if (!local(req.hostname) || (req.headers.origin && !local(new URL(req.headers.origin).hostname))) {
+          res.status(403).json({ error: "Local dashboard access only." });
+          return;
+        }
+      } catch { res.sendStatus(403); return; }
+      next();
+    });
+  } else { app.use(cors()); }
   app.use(express.json({ limit: "2mb" }));
+  if (process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1") {
+    const historyStore = deps.monitorHistoryStore === undefined
+      ? (process.env.DATABASE_URL ? new NeonMonitorHistory(process.env.DATABASE_URL) : null)
+      : deps.monitorHistoryStore;
+    app.use("/api/monitor-history", monitorHistoryRouter(
+      process.env.DYSPHAGRIP_EXPERIMENTS_DIR || path.join(homedir(), "prueba2", "experiments"), historyStore,
+    ));
+  }
+
+  if (localMode) mountLocalMonitor(app);
 
   const notConfigured = (res: Response) =>
     res.status(503).json({ error: "Neon is not configured", detail: "Set DATABASE_URL in .env and run npm run db:migrate --prefix server" });
@@ -46,6 +85,7 @@ export function createApp(deps: AppDeps = {}) {
     res.json({
       ok: true,
       service: "dysphagrip-api",
+      local_dashboard: localMode,
       integrations: {
         database: store !== null,
         elevenlabs: tts.configured,
@@ -121,6 +161,7 @@ export function createApp(deps: AppDeps = {}) {
     res.json({
       configured: tts.configured,
       provider: "elevenlabs",
+      fallback_provider: localMode ? "macos" : null,
       model_id: tts.modelId,
       voice: tts.configured ? await tts.voiceInfo() : null,
       phrases: VOICE_PHRASES,
@@ -134,8 +175,15 @@ export function createApp(deps: AppDeps = {}) {
     if (!isAllowedPhrase(message)) {
       return void res.status(400).json({ error: "Message is not an approved status phrase", allowed: VOICE_PHRASES });
     }
+    const localCue = localMode && (message === "Recording started." ? "started" : message === "Recording stopped." ? "stopped" : null);
+    function playLocalCue() {
+      res.setHeader("X-Voice-Provider", "macos");
+      res.sendFile(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../assets/status", localCue + ".m4a"));
+    }
+    if (!tts.configured && localCue) return void playLocalCue();
     if (!tts.configured) return void res.status(501).json({ error: "ElevenLabs is not configured" });
     if (!tts.isCached(message) && !ttsLimiter.tryTake()) {
+      if (localCue) return void playLocalCue();
       res.setHeader("Retry-After", "60");
       return void res.status(429).json({ error: "Voice rate limit reached; try again shortly" });
     }
@@ -143,9 +191,11 @@ export function createApp(deps: AppDeps = {}) {
       const { audio, cached } = await tts.synthesize(message);
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Cache-Control", "private, max-age=3600");
+      res.setHeader("X-Voice-Provider", "elevenlabs");
       res.setHeader("X-Voice-Cache", cached ? "hit" : "miss");
       res.send(Buffer.from(audio));
     } catch (error) {
+      if (localCue) return void playLocalCue();
       if (error instanceof TtsError) {
         console.error("Voice error:", error.message);
         return void res.status(error.status).json({ error: error.message, retryable: error.retryable });
@@ -154,6 +204,9 @@ export function createApp(deps: AppDeps = {}) {
       res.status(502).json({ error: "Voice service failed" });
     }
   });
+
+  app.get("/api/condition", async (_req, res) => { res.json(await readCondition()); });
+  app.get("/api/research", async (_req, res) => { res.json(await readResearch()); });
 
   // Attributed public-interest resources, collected offline by `npm run resources:refresh` (never on request).
   app.get("/api/resources", async (_req, res) => {

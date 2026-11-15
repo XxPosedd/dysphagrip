@@ -3,6 +3,12 @@
  * Docs: POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=…  (header: xi-api-key)
  */
 
+import { createHash, randomUUID } from "node:crypto";
+import { lstatSync, readFileSync } from "node:fs";
+import { lstat, mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
+
 export interface VoiceInfo {
   id: string;
   name: string | null;
@@ -33,10 +39,20 @@ export interface ElevenLabsOptions {
   baseUrl?: string;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  diskCacheDir?: string;
 }
 
 const DEFAULT_MODEL = "eleven_multilingual_v2"; // ElevenLabs' documented default
 const DEFAULT_FORMAT = "mp3_44100_128";          // available on every plan tier
+
+const DISK_PHRASES = ["Recording started.", "Recording stopped."];
+const VOICE_SETTINGS = { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true };
+const MAX_STATUS_AUDIO_BYTES = 2 * 1024 * 1024;
+function looksLikeMp3(audio: Uint8Array) {
+  return audio.length >= 100 && audio.length <= MAX_STATUS_AUDIO_BYTES &&
+    ((audio[0] === 0x49 && audio[1] === 0x44 && audio[2] === 0x33) ||
+     (audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0));
+}
 
 /** Translate ElevenLabs HTTP failures into messages that are useful and never contain the key. */
 export function describeElevenLabsError(status: number, body: string): TtsError {
@@ -71,10 +87,48 @@ export class ElevenLabsTts implements TextToSpeech {
   constructor(private readonly opts: ElevenLabsOptions) {
     this.modelId = opts.modelId || DEFAULT_MODEL;
     this.fetchImpl = opts.fetchImpl ?? fetch;
+    // Only two short clips are read on startup. This lets the rate limiter see
+    // offline hits immediately without adding latency to unrelated requests.
+    for (const phrase of DISK_PHRASES) {
+      const file = this.cacheFile(phrase);
+      if (!file) continue;
+      try {
+        const dir = lstatSync(path.dirname(file));
+        const info = lstatSync(file);
+        if (!dir.isDirectory() || (dir.mode & 0o077) || !info.isFile() ||
+            (info.mode & 0o077) || info.size > MAX_STATUS_AUDIO_BYTES) continue;
+        const audio = readFileSync(file);
+        if (looksLikeMp3(audio)) this.cache.set(phrase, audio);
+      } catch { /* Cache is optional, including on the first launch. */ }
+    }
   }
 
   private get base() {
     return (this.opts.baseUrl ?? "https://api.elevenlabs.io").replace(/\/$/, "");
+  }
+
+  private cacheFile(text: string): string | null {
+    const format = this.opts.outputFormat || DEFAULT_FORMAT;
+    if (!this.opts.diskCacheDir || !DISK_PHRASES.includes(text) || !format.startsWith("mp3_")) return null;
+    const fingerprint = createHash("sha256").update(JSON.stringify([
+      "elevenlabs", this.base, this.opts.voiceId, this.modelId, format, VOICE_SETTINGS, text,
+    ])).digest("hex");
+    return path.join(this.opts.diskCacheDir, fingerprint + ".mp3");
+  }
+
+  private async persist(text: string, audio: Uint8Array) {
+    const file = this.cacheFile(text);
+    if (!file || !looksLikeMp3(audio)) return;
+    const folder = path.dirname(file);
+    const temporary = path.join(folder, randomUUID() + ".tmp");
+    try {
+      await mkdir(folder, { recursive: true, mode: 0o700 });
+      const dir = await lstat(folder);
+      if (!dir.isDirectory() || (dir.mode & 0o077)) return;
+      await writeFile(temporary, audio, { flag: "wx", mode: 0o600 });
+      await rename(temporary, file);
+    } catch { /* A full or read-only filesystem must not silence a successful request. */ }
+    finally { await unlink(temporary).catch(() => {}); }
   }
 
   private async call(path: string, init: RequestInit): Promise<Response> {
@@ -120,12 +174,13 @@ export class ElevenLabsTts implements TextToSpeech {
       body: JSON.stringify({
         text,
         model_id: this.modelId,
-        voice_settings: { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true },
+        voice_settings: VOICE_SETTINGS,
       }),
     });
     if (!res.ok) throw describeElevenLabsError(res.status, await res.text().catch(() => ""));
     const audio = new Uint8Array(await res.arrayBuffer());
     if (audio.byteLength < 100) throw new TtsError("ElevenLabs returned empty audio", 502, true);
+    await this.persist(text, audio);
     return audio;
   }
 
@@ -162,7 +217,10 @@ export function ttsFromEnv(): TextToSpeech {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim();
   if (!apiKey || !voiceId) return notConfiguredTts;
-  return new ElevenLabsTts({ apiKey, voiceId, modelId: process.env.ELEVENLABS_MODEL_ID?.trim() || undefined });
+  const localCache = process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1" && process.env.DYSPHAGRIP_VOICE_CACHE !== "0";
+  const cacheRoot = process.platform === "darwin" ? path.join(homedir(), "Library", "Caches") : path.join(homedir(), ".cache");
+  const diskCacheDir = localCache ? process.env.DYSPHAGRIP_VOICE_CACHE_DIR || path.join(cacheRoot, "DysphaGrip", "elevenlabs") : undefined;
+  return new ElevenLabsTts({ apiKey, voiceId, modelId: process.env.ELEVENLABS_MODEL_ID?.trim() || undefined, diskCacheDir });
 }
 
 /** Simple fixed-window limiter for uncached synthesis calls (protects the ElevenLabs quota). */

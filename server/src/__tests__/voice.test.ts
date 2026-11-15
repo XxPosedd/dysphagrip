@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { ElevenLabsTts, RateLimiter, TtsError, describeElevenLabsError, notConfiguredTts, type TextToSpeech } from "../integrations/elevenlabs.js";
@@ -118,6 +121,33 @@ describe("ElevenLabsTts client", () => {
     expect((await tts.synthesize("Recording stopped.")).cached).toBe(true);
     expect(tts.isCached("Recording stopped.")).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays only successful ElevenLabs lifecycle MP3s across restarts with the same settings", async () => {
+    const diskCacheDir = await mkdtemp(path.join(tmpdir(), "dysphagrip-voice-"));
+    const bytes = new Uint8Array(MP3);
+    bytes.set([0x49, 0x44, 0x33]); // MP3 ID3 signature
+    try {
+      const options = { diskCacheDir };
+      const online = client(() => new Response(bytes, { headers: { "Content-Type": "audio/mpeg" } }), options);
+      await online.tts.synthesize("Recording started.");
+      await online.tts.synthesize("Audio signal detected.");
+      const [file] = await readdir(diskCacheDir);
+      expect(await readdir(diskCacheDir)).toHaveLength(1);
+      expect((await stat(path.join(diskCacheDir, file))).mode & 0o777).toBe(0o600);
+      const offline = client(() => { throw Error("offline"); }, options);
+      expect(offline.tts.isCached("Recording started.")).toBe(true);
+      expect(offline.tts.isCached("Audio signal detected.")).toBe(false);
+      const hit = await offline.tts.synthesize("Recording started.");
+      expect(hit.cached).toBe(true);
+      expect([...hit.audio]).toEqual([...bytes]);
+      expect(offline.fetchImpl).not.toHaveBeenCalled();
+      for (const change of [{ voiceId: "other" }, { modelId: "other" }, { outputFormat: "mp3_22050_32" }]) {
+        expect(client(() => new Response(bytes), { ...options, ...change }).tts.isCached("Recording started.")).toBe(false);
+      }
+      await expect(offline.tts.synthesize("Recording stopped.")).rejects.toThrow();
+      expect(await readdir(diskCacheDir)).toHaveLength(1);
+    } finally { await rm(diskCacheDir, { recursive: true, force: true }); }
   });
 
   it("maps a bad key to a clear error that never contains the key", async () => {

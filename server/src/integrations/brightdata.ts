@@ -4,9 +4,9 @@
  *       body: { zone, url, format: "raw" }  -> raw response body of the target page.
  *
  * Responsible use in this project:
- *  - Only hosts in BRIGHT_DATA_ALLOWED_HOSTS (vetted public-domain US-government pages) can be requested.
+ *  - Requests use a source-specific HTTPS host allowlist.
  *  - Pages that come back as bot challenges are skipped, never retried around.
- *  - Collection runs from a CLI script (npm run resources:refresh), never from a public HTTP endpoint.
+ *  - The resource CLI refreshes educational pages. The research API checks fixed Crossref DOIs.
  */
 import { BRIGHT_DATA_ALLOWED_HOSTS } from "../resources/sources.js";
 
@@ -46,20 +46,17 @@ export class BrightDataClient {
       throw new BrightDataError(`Refusing to collect from non-vetted host: ${host}`);
     }
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.opts.timeoutMs ?? 60_000);
+    const signal = AbortSignal.timeout(this.opts.timeoutMs ?? 60_000);
     let res: Response;
     try {
       res = await this.fetchImpl(`${(this.opts.baseUrl ?? "https://api.brightdata.com").replace(/\/$/, "")}/request`, {
         method: "POST",
         headers: { Authorization: `Bearer ${this.opts.apiToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ zone: this.opts.zone, url, format: "raw" }),
-        signal: ctrl.signal,
+        signal,
       });
-    } catch (e) {
-      throw new BrightDataError((e as Error).name === "AbortError" ? "Bright Data request timed out" : "Could not reach Bright Data");
-    } finally {
-      clearTimeout(timer);
+    } catch {
+      throw new BrightDataError(signal.aborted ? "Bright Data request timed out" : "Could not reach Bright Data");
     }
 
     if (!res.ok) {
@@ -88,8 +85,8 @@ export class BrightDataClient {
   }
 }
 
-export function brightDataFromEnv(): BrightDataClient | null {
+export function brightDataFromEnv(options: Pick<BrightDataOptions, "allowedHosts" | "timeoutMs"> = {}): BrightDataClient | null {
   const apiToken = process.env.BRIGHTDATA_API_TOKEN?.trim();
   const zone = process.env.BRIGHTDATA_ZONE?.trim();
-  return apiToken && zone ? new BrightDataClient({ apiToken, zone }) : null;
+  return apiToken && zone ? new BrightDataClient({ apiToken, zone, ...options }) : null;
 }

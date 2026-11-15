@@ -10,6 +10,12 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 > treatment or emergency decisions. Demos use consenting healthy volunteers and ordinary,
 > comfortable activity only. See [docs/SAFETY_AND_CLAIMS.md](docs/SAFETY_AND_CLAIMS.md).
 
+## English live dashboard on macOS
+
+The **webpage** branch contains the dashboard and API. The **ai** branch of the companion sensor project contains the Mac launcher, the Arduino reader, and the activity classifiers. Clone the two branches side by side and run **Open DysphaGrip.command** from the sensor project. [Mac setup and launch instructions](https://github.com/maxhrdz/test2/blob/ai/README.md#opening-the-english-dashboard-on-macos)
+
+With the M-Audio AIR 192|6 and Arduino UNO Q connected, select **Record** to see contact audio, acceleration, and angular speed. **Stop** saves the recording locally and syncs its summary to Neon when configured. **Research** links to dysphagia studies retrieved through Bright Data. **Preview voice** plays the two recording announcements with ElevenLabs when configured.
+
 ## Proyecto 2 · probar la página sin Arduino
 
 Desde la raíz de esta rama, con Node.js 20 o superior:
@@ -19,7 +25,7 @@ npm ci --prefix apps/web
 npm run dev --prefix apps/web
 ```
 
-Abre la dirección que imprime Vite (normalmente <http://localhost:5173>). El laboratorio funciona en el navegador sin Arduino App Lab, micrófono, Python ni claves de servicios.
+Abre la dirección que imprime Vite y añade `?vista=laboratorio` (normalmente <http://localhost:5173/?vista=laboratorio>). El laboratorio funciona en el navegador sin Arduino App Lab, micrófono, Python ni claves de servicios.
 
 - En **Práctica**, inicia una sesión, genera un pulso de audio y otro de movimiento dentro de 0.65 s (o genera ambos juntos). Marca la acción con los botones o las teclas **1–5**. Al terminar puedes descargar los resultados simulados.
 - En **Revisar un experimento**, selecciona una carpeta de sesión de `prueba2/experiments/`, o descomprime primero el ZIP exportado por la práctica. Se leen las etiquetas, las predicciones, sus correspondencias y el resumen. Si la sesión de Python incluye `captures/mark_XXXX/`, podrás escuchar el WAV e inspeccionar los seis ejes del MPU6050. Los archivos seleccionados se procesan localmente.

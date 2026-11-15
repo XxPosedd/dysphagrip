@@ -173,6 +173,20 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [ ] Phase 8: Bright Data
 - [ ] Phase 9: deployment
 
+## Repository
+
+GitHub: https://github.com/XxPosedd/dysphagrip (private).
+
+To set up another machine (e.g. the MacBook used for audio capture):
+
+```bash
+git clone https://github.com/XxPosedd/dysphagrip.git
+cd dysphagrip
+```
+
+Then follow *Run locally* above. `.env`, `.neon`, `node_modules/`, `.venv/` and recordings are git-ignored,
+so create `.env` on each machine (copy `.env.example`, or run `neon init` to pull the Neon variables).
+
 ## Deploy
 
 `render.yaml` and the `Dockerfile` build the web app and serve it from Express. The Python audio

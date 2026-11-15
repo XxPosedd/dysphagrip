@@ -73,6 +73,16 @@ docs/                     decisions, open questions, safety, demo script
 .vscode/                  launch configs and tasks
 ```
 
+## Demo laptop quick start (2 commands)
+
+```bash
+git clone https://github.com/XxPosedd/dysphagrip.git && cd dysphagrip && bash scripts/setup-demo.sh
+bash scripts/start-demo.sh          # then open http://localhost:5173   (Ctrl+C stops everything)
+```
+`setup-demo.sh` installs everything, asks for the three keys (sent to you privately: Neon `DATABASE_URL`,
+`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`; hidden input, quotes stripped), and lists audio inputs and serial ports.
+Works on macOS, Linux and Windows (Git Bash). Needs Node 20+ and Python 3.10+.
+
 ## Run locally (VS Code)
 
 Requirements: Node.js 20+, Python 3.10+ (verified on 3.14), Git.

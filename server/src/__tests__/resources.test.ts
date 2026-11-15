@@ -108,6 +108,17 @@ describe("BrightDataClient", () => {
     await expect(zone.client.fetchPage(NIDCD_PAGES[0])).rejects.toThrow(/BRIGHTDATA_ZONE/);
   });
 
+  it("treats a 200 with x-brd-error (policy block) as a failure, not a page", async () => {
+    // Exact shape observed live on 2026-11-14 for www.nidcd.nih.gov.
+    const blocked = make(() => new Response("", { status: 200, headers: { "x-brd-error":
+      "Access denied: www.nidcd.nih.gov is classified as Government and blocked by Bright Data as it might breach Bright Data usage policy." } }));
+    const e = await blocked.client.fetchPage(NIDCD_PAGES[0]).catch((x) => x);
+    expect(e).toBeInstanceOf(BrightDataError);
+    expect(e.message).toMatch(/refused www\.nidcd\.nih\.gov \(Bright Data usage policy\): Access denied/);
+    const empty = make(() => new Response("", { status: 200 }));
+    await expect(empty.client.fetchPage(NIDCD_PAGES[0])).rejects.toThrow(/empty response/);
+  });
+
   it("times out", async () => {
     const { client } = make((_u, init) => new Promise((_r, rej) => init.signal?.addEventListener("abort", () =>
       rej(Object.assign(new Error("aborted"), { name: "AbortError" })))), { timeoutMs: 20 });

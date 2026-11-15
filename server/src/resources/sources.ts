@@ -11,6 +11,11 @@
  *   - dysphagiaresearch.org: Cloudflare bot challenge.
  *   - nidcd.nih.gov 2018 aging news item: its description recommends an exercise programme (intervention).
  *   - nidcd.nih.gov/health/voice-speech-and-language: no page description; summary would have to be invented.
+ *
+ * LIVE FINDING 2026-11-14: Bright Data refuses www.nidcd.nih.gov ("classified as Government and blocked by Bright Data
+ * as it might breach Bright Data usage policy"); its docs state government websites are blocked across all networks.
+ * The NIDCD pages therefore cannot be collected through Bright Data. They are kept here only until replacement
+ * non-government sources are vetted; every refresh reports them as refused rather than storing anything.
  */
 
 export const NIDCD_LICENSE =

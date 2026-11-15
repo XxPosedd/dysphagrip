@@ -76,7 +76,15 @@ export class BrightDataClient {
         res.status,
       );
     }
-    return res.text();
+    // Bright Data can refuse a target (e.g. a policy block) with HTTP 200, an empty body and an x-brd-error header.
+    const refused = res.headers.get("x-brd-error");
+    const body = await res.text();
+    if (refused) {
+      const policy = /usage policy|classified as|blocked by Bright Data/i.test(refused);
+      throw new BrightDataError(`Bright Data refused ${host}${policy ? " (Bright Data usage policy)" : ""}: ${refused.slice(0, 300)}`, res.status);
+    }
+    if (!body.trim()) throw new BrightDataError(`Bright Data returned an empty response for ${host}`, res.status);
+    return body;
   }
 }
 

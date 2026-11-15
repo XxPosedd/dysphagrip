@@ -6,6 +6,8 @@ RUN npm ci --prefix apps/web && npm ci --prefix server
 COPY apps/web ./apps/web
 COPY server ./server
 ARG VITE_DYSPHAGRIP_PUBLIC=0
+ARG VITE_DYSPHAGRIP_BASE=/
+ARG VITE_DYSPHAGRIP_SHARED_HOST=0
 RUN npm run build --prefix apps/web && npm run build --prefix server && npm prune --omit=dev --prefix server
 
 FROM node:22-alpine

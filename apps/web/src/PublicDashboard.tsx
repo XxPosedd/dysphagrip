@@ -7,6 +7,8 @@ import { api } from "./lib/api";
 import comparison from "./assets/comparacion-saliva-movimiento.png";
 import "./live-monitor.css";
 
+const sharedHost = import.meta.env.VITE_DYSPHAGRIP_SHARED_HOST === "1";
+
 export default function PublicDashboard() {
   const voice = useRecordingVoice();
   const [voiceAvailable, setVoiceAvailable] = useState<boolean | null>(null);
@@ -25,7 +27,9 @@ export default function PublicDashboard() {
         <p>A contact microphone measures neck vibrations. A motion sensor measures acceleration and rotation.
           The Mac uses both signals to estimate swallowing, speaking, coughing, head movement, and rest.</p>
       </div>
-      <a className="btn btn-ghost" href="?vista=laboratorio#practica">Practice lab (Spanish)</a>
+      <a className="btn btn-ghost" href={sharedHost ? "/?view=lab" : "?vista=laboratorio#practica"}>
+        {sharedHost ? "Practice lab" : "Practice lab (Spanish)"}
+      </a>
     </section>
     <div className="grid-main">
       <Card title="Recorded signal comparison">
@@ -53,6 +57,7 @@ export default function PublicDashboard() {
         <div id="history"><Card title="Recording and session history">
           <p>Start a session on the Mac connected to the microphone and Arduino. The workstation displays live signals,
             accepts manual marks, and keeps recordings private. Session summaries can sync to Neon.</p>
+          {sharedHost && <a className="resource-title" href="/?view=monitor">Open hosted monitor</a>}
         </Card></div>
       </div>
     </div>

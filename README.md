@@ -264,4 +264,16 @@ For live research metadata, pass `--brightdata-env "/path/to/providers.env"`. Th
 
 Run the same command to update the host. Previously supplied clips, Bright Data credentials, and domain configuration persist in `/opt/dysphagrip/settings`. Verify the deployed instance at `/api/health`. Caddy's certificate storage persists across container restarts. [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https)
 
+#### Existing Caddy site
+
+For an existing HTTPS site, run `python3 deploy/vultr.py root@203.0.113.10 --existing-proxy`. This starts the dashboard in the `dysphagrip-public` Compose project with its files in `/opt/dysphagrip-public` and its HTTP listener on `127.0.0.1:3001`. Add these routes inside the existing Caddy domain block, with the original site's catch-all in a separate `handle` block.
+
+```caddyfile
+redir /dashboard /dashboard/ 308
+handle_path /dashboard/* {
+    reverse_proxy 127.0.0.1:3001
+}
+```
+
+After validating and reloading the site's Caddy configuration, open `https://your-domain/dashboard/` and check `/dashboard/api/health`. Use `--existing-proxy` on each subsequent deploy to this site.
 

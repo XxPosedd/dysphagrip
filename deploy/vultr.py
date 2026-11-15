@@ -50,9 +50,11 @@ def deploy(args):
             (folder / "brightdata.env").write_text(brightdata_settings(args.brightdata_env))
         if args.domain:
             (folder / "site-address").write_text(args.domain.lower() + "\n")
+        if args.existing_proxy:
+            (folder / "existing-proxy").touch()
         bundle = folder / "bundle.tar.gz"
         with tarfile.open(bundle, "w:gz") as package:
-            for name in ("source.tar.gz", "revision", "brightdata.env", "site-address"):
+            for name in ("source.tar.gz", "revision", "brightdata.env", "site-address", "existing-proxy"):
                 if (folder / name).is_file():
                     package.add(folder / name, arcname=name)
             if args.voice_dir:
@@ -79,7 +81,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("host", help="SSH alias or root@public-IP")
     parser.add_argument("--ssh-key", type=Path, help="SSH private key for the Vultr VM")
-    parser.add_argument("--domain", help="Domain already pointing to the VM, for automatic HTTPS")
+    routing = parser.add_mutually_exclusive_group()
+    routing.add_argument("--domain", help="Domain already pointing to the VM, for automatic HTTPS")
+    routing.add_argument("--existing-proxy", action="store_true",
+                         help="Serve /dashboard/ via an existing proxy using upstream 127.0.0.1:3001")
     parser.add_argument("--brightdata-env", type=Path, help="Read the Bright Data token and zone from this .env file")
     parser.add_argument("--voice-dir", type=Path, help="Directory containing the two ElevenLabs clips started.mp3 and stopped.mp3")
     args = parser.parse_args()

@@ -1,0 +1,11 @@
+services:
+  app:
+    image: dysphagrip-shared-dashboard:${RELEASE_COMMIT:-latest}
+    build:
+      args:
+        VITE_DYSPHAGRIP_BASE: /dashboard/
+        VITE_DYSPHAGRIP_SHARED_HOST: "1"
+    ports:
+      - "127.0.0.1:3001:3000"
+  proxy:
+    profiles: ["standalone"]

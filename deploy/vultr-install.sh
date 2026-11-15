@@ -3,7 +3,9 @@
 set -eu
 umask 077
 stage=$1
-root=/opt/dysphagrip
+project=dysphagrip
+if [ -f "$stage/existing-proxy" ]; then project=dysphagrip-public; fi
+root="/opt/$project"
 revision=$(cat "$stage/revision")
 export SETTINGS_DIR="$root/settings"
 export RELEASE_COMMIT="$revision"
@@ -31,7 +33,13 @@ if [ ! -d "$release" ]; then
     mv "$pending" "$release"
 fi
 cd "$release"
-compose() { docker compose -p dysphagrip -f deploy/compose.yaml "$@"; }
+compose() {
+    if [ -f "$stage/existing-proxy" ]; then
+        docker compose -p "$project" -f deploy/compose.yaml -f deploy/compose.existing-proxy.yaml "$@"
+    else
+        docker compose -p "$project" -f deploy/compose.yaml "$@"
+    fi
+}
 touch "$SETTINGS_DIR/brightdata.env"
 compose build app
 if [ -f "$stage/brightdata.env" ]; then
@@ -53,10 +61,16 @@ fi
 SITE_ADDRESS=:80
 if [ -f "$SETTINGS_DIR/site-address" ]; then SITE_ADDRESS=$(cat "$SETTINGS_DIR/site-address"); fi
 export SITE_ADDRESS
-compose up -d --wait --wait-timeout 120
+if [ -f "$stage/existing-proxy" ]; then
+    compose up -d --wait --wait-timeout 120 app
+else
+    compose up -d --wait --wait-timeout 120
+fi
 ln -sfn "$release" "$root/.next"
 mv -Tf "$root/.next" "$root/current"
-if [ "$SITE_ADDRESS" = ":80" ]; then
+if [ -f "$stage/existing-proxy" ]; then
+    curl -fsS --retry 8 --retry-connrefused http://127.0.0.1:3001/api/health
+elif [ "$SITE_ADDRESS" = ":80" ]; then
     curl -fsS --retry 8 --retry-connrefused http://127.0.0.1/api/health
 else
     curl -fsS --retry 10 --retry-all-errors --retry-max-time 90 --resolve "$SITE_ADDRESS:443:127.0.0.1" "https://$SITE_ADDRESS/api/health"

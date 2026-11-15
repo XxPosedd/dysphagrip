@@ -12,6 +12,16 @@ Time needed: about 30 minutes, most of it waiting for DNS and HTTPS.
 
 ---
 
+## Fastest: one-command setup (no domain needed)
+On a fresh **Ubuntu 24.04** Vultr server (smallest Cloud Compute plan is fine):
+```bash
+ssh root@SERVER_IP
+curl -fsSL https://raw.githubusercontent.com/XxPosedd/dysphagrip/main/deploy/vultr-setup.sh -o setup.sh && bash setup.sh
+```
+It asks for your Neon `DATABASE_URL` and ElevenLabs key/voice ID (hidden input, saved only on the server), builds and
+starts the app in read-only mode, and prints your HTTPS address (`https://<ip-with-dashes>.sslip.io`).
+The manual steps below do the same thing by hand.
+
 ## No domain? (privacy option, recommended if WHOIS privacy isn't available)
 Some domain endings (e.g. `.us`) **do not allow WHOIS privacy**, so your name, address and phone number become public.
 You can skip the domain entirely:

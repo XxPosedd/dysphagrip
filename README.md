@@ -12,6 +12,8 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 
 ## English live dashboard on macOS
 
+Open the [public dashboard on Vultr](https://66-42-64-41.sslip.io/dashboard/) to explore a recorded signal comparison, listen to the ElevenLabs announcements, and read the studies retrieved through Bright Data. The [hosted monitor](https://66-42-64-41.sslip.io/?view=monitor) also links to the demo's session history.
+
 The **webpage** branch contains the dashboard and API. The **ai** branch of the companion sensor project contains the Mac launcher, the Arduino reader, and the activity classifiers. Clone the two branches side by side and run **Open DysphaGrip.command** from the sensor project. [Mac setup and launch instructions](https://github.com/maxhrdz/test2/blob/ai/README.md#opening-the-english-dashboard-on-macos)
 
 With the M-Audio AIR 192|6 and Arduino UNO Q connected, select **Record** to see contact audio, acceleration, and angular speed. **Stop** saves the recording locally and syncs its summary to Neon when configured. **Research** links to dysphagia studies retrieved through Bright Data. **Preview voice** plays the two recording announcements with ElevenLabs when configured.
@@ -232,7 +234,7 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
 - [x] Phase 7: ElevenLabs (live: cues spoken in a real session; allowlisted phrases, caching, rate limit)
 - [x] Phase 8: Bright Data (live: 3 non-profit pages via Bright Data + 2 MedlinePlus topics via official API)
-- [ ] Phase 9: deployment
+- [x] Phase 9: public dashboard deployed on Vultr with HTTPS
 
 ## Repository
 

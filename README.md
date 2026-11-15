@@ -16,7 +16,7 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 |---|---|---|
 | Best Overall Hack | End-to-end live audio + motion capture, synchronised dashboard, signal quality, history | Audio service ✅ · dashboard ✅ (audio) · motion 🚧 |
 | Bright Data: Data for Good | Attributed public-interest swallowing/dysphagia resources with source URL + retrieval time | 🚧 Phase 8 |
-| ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Implemented and tested · live voice check pending API key |
+| ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Live: voice "Matilda", spoken cues verified in the dashboard |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
 An integration is only claimed once it is implemented, tested and visible in the demo.
@@ -182,7 +182,7 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [ ] Phase 4: shared session clock
 - [x] Phase 5: React dashboard (audio side live; motion panels wait for Phase 3)
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
-- [x] Phase 7: ElevenLabs (allowlisted phrases, caching, rate limit; live check pending `ELEVENLABS_API_KEY`)
+- [x] Phase 7: ElevenLabs (live: cues spoken in a real session; allowlisted phrases, caching, rate limit)
 - [ ] Phase 8: Bright Data
 - [ ] Phase 9: deployment
 

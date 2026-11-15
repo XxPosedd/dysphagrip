@@ -4,6 +4,7 @@ import { Spectrogram } from "./components/Spectrogram";
 import { Timeline } from "./components/Timeline";
 import { Waveform } from "./components/Waveform";
 import { MotionPanel } from "./components/Motion";
+import { AnomalyExplanation } from "./components/AnomalyExplanation";
 import { Chip, MarkerList, QualityPanel, SessionHistory, SummaryView, VoicePanel, type DbState, type LocalSession } from "./components/Panels";
 import { useAudioService } from "./hooks/useAudioService";
 import { useVoice } from "./hooks/useVoice";
@@ -27,6 +28,7 @@ export default function App() {
   voiceRef.current = voice;   // listeners registered on the recorder always use the current toggle state
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [apiDown, setApiDown] = useState(false);
+  const [activeTab, setActiveTab] = useState<"monitor" | "anomaly">("monitor");
 
   const [device, setDevice] = useState<number | null>(null);
   const [channel, setChannel] = useState(0);
@@ -226,7 +228,13 @@ export default function App() {
         signal features only. It does not diagnose dysphagia, does not detect aspiration or residue, and cannot confirm that
         swallowing is safe.</p>
 
-      <section className="controls card">
+      <nav className="tab-nav card" aria-label="Dashboard views">
+        <button className={`tab-button ${activeTab === "monitor" ? "active" : ""}`} aria-pressed={activeTab === "monitor"} onClick={() => setActiveTab("monitor")}>Monitor</button>
+        <button className={`tab-button ${activeTab === "anomaly" ? "active" : ""}`} aria-pressed={activeTab === "anomaly"} onClick={() => setActiveTab("anomaly")}>AI anomaly review</button>
+      </nav>
+
+      {activeTab === "monitor" ? <>
+        <section className="controls card">
         <div className="control-group">
           <label>Audio input
             <select value={device ?? ""} disabled={running || !audio.devices.length}
@@ -323,6 +331,20 @@ export default function App() {
         onRetry={retrySave} onDelete={deleteRemote} />
 
       <ResourcesPanel brightDataConfigured={health?.integrations.brightdata ?? false} />
+
+      </> : <section className="card anomaly-view">
+        <div className="card-head"><h2>AI anomaly review</h2><Chip tone="warning">Research mode</Chip></div>
+        <p className="anomaly-lead">This experimental review compares live sensor windows with a short-term reference built from this recording.</p>
+        <div className="notice-inline"><strong>Review method:</strong> Transparent outlier check is active; the experimental Python ML model is not trained or connected.</div>
+        <div className="anomaly-grid">
+          <div className="metric"><span>Microphone</span><strong>{audio.latest ? `${audio.latest.features.rms_dbfs.toFixed(1)} dBFS` : "Waiting for data"}</strong></div>
+          <div className="metric"><span>Motion</span><strong>{audio.motionLatest?.features.movement_score !== undefined ? audio.motionLatest.features.movement_score.toFixed(2) : "Waiting for data"}</strong></div>
+          <div className="metric"><span>Signal quality</span><strong>{audio.latest?.quality.label.replaceAll("_", " ") ?? "—"}</strong></div>
+        </div>
+        <AnomalyExplanation frame={audio.latest} motion={audio.motionLatest} />
+        <p className="muted small">The deck’s referenced public dataset has swallow timing annotations but no normal-versus-dysphagia labels, so it cannot by itself train a diagnostic classifier.</p>
+        <p className="disclaimer"><strong>Not a diagnostic result.</strong> An unusual signal cannot determine whether someone has dysphagia or whether swallowing is safe.</p>
+      </section>}
 
       <footer className="muted small">Raw audio never leaves this computer: the browser receives only waveform envelopes,
         spectrogram columns and signal features from the local audio service.</footer>

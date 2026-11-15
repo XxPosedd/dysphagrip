@@ -70,6 +70,52 @@ def cmd_probe(args) -> int:
     return 0
 
 
+def cmd_motion_ports(_args) -> int:
+    from .motion import list_serial_ports
+    ports = list_serial_ports()
+    if not ports:
+        print("No serial ports found. Is the Arduino UNO Q connected by USB?")
+        return 1
+    for p in ports:
+        tag = "<-- likely Arduino" if p["likely_arduino"] else ""
+        print(f"{p['device']:<28} {tag:<20} {p['description']}")
+    return 0
+
+
+def cmd_motion_probe(args) -> int:
+    """Print live MPU-6050 readings, rate and clock-sync figures: the first hardware check."""
+    from .motion import MotionStream
+    stream = MotionStream(args.source)
+    print(f"Reading {stream.source.describe()} for {args.seconds:.0f}s. Move the sensor. Ctrl+C to stop.")
+    stream.start()
+    t_end = time.time() + args.seconds
+    last_total = 0
+    try:
+        while time.time() < t_end:
+            time.sleep(1.0)
+            frame = stream.drain_frame()
+            st = stream.status()
+            rate = st["samples_total"] - last_total
+            last_total = st["samples_total"]
+            if frame:
+                s0 = frame["samples"][-1]
+                f = frame["features"]
+                flag = " INTERFERENCE" if f.get("interference") else ""
+                print(f"{rate:4d} Hz | a=({s0['ax']:+.3f},{s0['ay']:+.3f},{s0['az']:+.3f}) g "
+                      f"g=({s0['gx']:+7.2f},{s0['gy']:+7.2f},{s0['gz']:+7.2f}) dps | "
+                      f"move {f.get('movement_score', 0):.2f}{flag} | "
+                      f"offset {st['sync']['offset_ms']} ms jitter95 {st['sync']['jitter_p95_ms']} ms")
+            else:
+                print(f"no samples | connected={st['connected']} error={st['last_error'] or '-'} "
+                      f"device_errors={st['device_errors'] or '-'}")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stream.stop()
+    print("device:", stream.device, "| seq gaps:", stream.seq_gaps, "| parse errors:", stream.parse_errors)
+    return 0
+
+
 def cmd_serve(args) -> int:
     import uvicorn
     from .config import AudioConfig
@@ -100,6 +146,12 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--device", default="um2", help="index, name substring, 'um2' or 'default'")
     pr.add_argument("--seconds", type=float, default=20.0)
     pr.set_defaults(fn=cmd_probe)
+
+    sub.add_parser("motion-ports", help="list serial ports (find the Arduino UNO Q)").set_defaults(fn=cmd_motion_ports)
+    mp = sub.add_parser("motion-probe", help="live MPU-6050 readings from the UNO Q")
+    mp.add_argument("--source", default="auto", help="auto | serial:PORT | tcp://HOST:PORT")
+    mp.add_argument("--seconds", type=float, default=20.0)
+    mp.set_defaults(fn=cmd_motion_probe)
 
     sv = sub.add_parser("serve", help="run the HTTP/WebSocket service")
     sv.add_argument("--host", default="127.0.0.1")

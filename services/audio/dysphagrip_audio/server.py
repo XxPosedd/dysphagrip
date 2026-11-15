@@ -28,6 +28,7 @@ from .capture import DeviceSource, WavFileSource
 from .config import AudioConfig
 from .devices import DeviceNotFound, list_input_devices, resolve_device
 from .processor import FrameProcessor
+from .motion import MotionConfig, MotionStream, list_serial_ports
 
 log = logging.getLogger("dysphagrip.audio")
 STATIC = Path(__file__).parent / "static"
@@ -37,6 +38,11 @@ DEFAULT_ORIGINS = [
     "http://localhost:3000", "http://127.0.0.1:3000",   # Express (production build)
     "http://localhost:8765", "http://127.0.0.1:8765",   # this service's viewer
 ]
+
+
+class MotionStartRequest(BaseModel):
+    # "auto" | "serial:COM5" | "serial:/dev/cu.usbmodem101" | "tcp://HOST:PORT"
+    source: str = "auto"
 
 
 class StartRequest(BaseModel):
@@ -166,11 +172,75 @@ class AudioService:
             self.clients.discard(ws)
 
 
+class MotionManager:
+    """Runs at most one MotionStream and pumps its frames to WebSocket clients at ~20 Hz."""
+
+    def __init__(self, service: "AudioService", factory: Callable[[str], MotionStream], hop_s: float = 0.05):
+        self.service = service
+        self.factory = factory
+        self.hop_s = hop_s
+        self.stream: MotionStream | None = None
+        self._task: asyncio.Task | None = None
+        self._was_receiving = False
+
+    def status(self) -> dict:
+        return {"running": self.stream is not None, **(self.stream.status() if self.stream else {})}
+
+    async def start(self, spec: str) -> dict:
+        stream = self.factory(spec)        # may raise LookupError / ValueError before anything is stopped
+        await self.stop(broadcast=False)
+        stream.start()
+        self.stream = stream
+        self._was_receiving = False
+        self._task = asyncio.create_task(self._pump())
+        await self.service.broadcast({"type": "motion_status", **self.status()})
+        return self.status()
+
+    async def stop(self, broadcast: bool = True) -> dict:
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            self._task = None
+        if self.stream is not None:
+            await asyncio.to_thread(self.stream.stop)
+            self.stream = None
+        if broadcast:
+            await self.service.broadcast({"type": "motion_status", **self.status()})
+        return self.status()
+
+    async def _pump(self) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time()
+        ticks = 0
+        while True:
+            deadline += self.hop_s
+            await asyncio.sleep(max(0.0, deadline - loop.time()))
+            stream = self.stream
+            if stream is None:
+                return
+            frame = stream.drain_frame()
+            if frame is not None:
+                await self.service.broadcast(frame)
+            receiving = stream.receiving
+            ticks += 1
+            # Status on change (sensor connected / lost) and once a second for sync/health numbers.
+            if receiving != self._was_receiving or ticks % 20 == 0:
+                self._was_receiving = receiving
+                await self.service.broadcast({"type": "motion_status", **self.status()})
+
+
 def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | None = None,
                autostart: StartRequest | None = None, allowed_origins: list[str] | None = None,
-               device_lister: Callable[[], list[dict]] = list_input_devices) -> FastAPI:
+               device_lister: Callable[[], list[dict]] = list_input_devices,
+               motion_factory: Callable[[str], MotionStream] | None = None,
+               port_lister: Callable[[], list[dict]] = list_serial_ports,
+               motion_config: MotionConfig | None = None) -> FastAPI:
     cfg = cfg or AudioConfig()
     service = AudioService(cfg, source_factory or default_source_factory())
+    motion = MotionManager(service, motion_factory or (lambda spec: MotionStream(spec, motion_config)))
     origins = allowed_origins or DEFAULT_ORIGINS
 
     @asynccontextmanager
@@ -182,16 +252,19 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
                 service.last_error = f"Autostart failed: {exc}"
                 log.error(service.last_error)
         yield
+        await motion.stop(broadcast=False)
         await service.stop()
 
     app = FastAPI(title="DysphaGrip audio service", version="0.1.0", lifespan=lifespan)
     app.state.service = service
+    app.state.motion = motion
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"],
                        allow_headers=["Content-Type"])
 
     @app.get("/health")
     async def health():
-        return {"ok": True, "service": "dysphagrip-audio", "running": service.running}
+        return {"ok": True, "service": "dysphagrip-audio", "running": service.running,
+                "motion_running": motion.stream is not None}
 
     @app.get("/devices")
     async def devices():
@@ -225,6 +298,28 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
     async def stop():
         return await service.stop()
 
+    # ---- Motion (MPU-6050 via Arduino UNO Q) ----
+    @app.get("/motion/ports")
+    async def motion_ports():
+        return {"ports": await asyncio.to_thread(port_lister)}
+
+    @app.get("/motion/status")
+    async def motion_status():
+        return motion.status()
+
+    @app.post("/motion/start")
+    async def motion_start(req: MotionStartRequest):
+        try:
+            return await motion.start(req.source)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/motion/stop")
+    async def motion_stop():
+        return await motion.stop()
+
     @app.websocket("/stream")
     async def stream(ws: WebSocket):
         origin = ws.headers.get("origin")
@@ -233,7 +328,7 @@ def create_app(cfg: AudioConfig | None = None, source_factory: SourceFactory | N
             return
         await ws.accept()
         service.clients.add(ws)
-        await ws.send_text(json.dumps({"type": "hello", **service.status()}))
+        await ws.send_text(json.dumps({"type": "hello", **service.status(), "motion": motion.status()}))
         try:
             while True:
                 await ws.receive_text()   # clients don't need to send; this detects disconnect

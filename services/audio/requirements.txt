@@ -2,6 +2,7 @@
 numpy>=1.26
 scipy>=1.11
 sounddevice>=0.4.6        # PortAudio bindings (bundled on macOS/Windows wheels)
+pyserial>=3.5             # Arduino UNO Q / MPU-6050 serial stream
 fastapi>=0.110
 uvicorn[standard]>=0.27   # includes websockets support
 

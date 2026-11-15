@@ -58,7 +58,8 @@ def make_client():
 
 def test_health_and_devices():
     with make_client() as c:
-        assert c.get("/health").json() == {"ok": True, "service": "dysphagrip-audio", "running": False}
+        assert c.get("/health").json() == {"ok": True, "service": "dysphagrip-audio", "running": False,
+                                           "motion_running": False}
         body = c.get("/devices").json()
         assert body["um2_candidate"] == 3
 

@@ -111,3 +111,19 @@
   "© publisher · linked". Test fixtures keep only each page's `<title>`/`<meta>` tags, not the body.
 - Client fix: a 200 response carrying `x-brd-error`, or an empty body, is now an error rather than a "page". The parser
   ignores markup inside HTML comments.
+
+## Team merge (15 Nov): `webpage` + `ai-anomalies` into main
+
+- Merged maxhrdz's `webpage` (signal lab, simulation bench, session-folder review, audio+movement coincidence
+  detector, Tilt/Turn sensor-line support) and Shaheer Ali's `ai-anomalies` (live "AI anomaly review" tab). Both merged
+  without conflicts, and the combined tree passes every test, typecheck and build.
+- **English UI**: the merged Spanish interface was translated. The live monitor is the front page again; the lab is
+  at `?view=lab` (legacy `?vista=monitor` still opens the monitor). Simulated practice sessions stay labelled
+  "SIMULATION" (older Spanish "SIMULACIÓN" exports are still recognised as simulated).
+- **Wording**: the coincidence marker is labelled "Candidate swallow-like event (experimental)", and the detector
+  card states it is a coincidence heuristic, not swallow detection.
+- `anomaly.py` (offline IsolationForest, not imported anywhere) moved to `services/audio/research/` with its own
+  requirements, so the app install does not need scikit-learn.
+- Neon migrated to allow the new `possible_swallow_event` marker kind.
+- Not merged: `feature/dysphagrip-v2-live-dashboard` (a parallel rewrite that conflicts with main in six core
+  files; needs a team decision).

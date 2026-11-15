@@ -44,14 +44,14 @@ export class FusionDetector {
   status(ms: number): string {
     const audio = ms - this.latest.audio <= 1000;
     const motion = ms - this.latest.motion <= 1000;
-    if (!audio && !motion) return "Esperando audio y movimiento";
-    if (!audio) return "Esperando audio";
-    if (!motion) return "Esperando movimiento";
-    if (this.calibrated) return "Detector activo";
+    if (!audio && !motion) return "Waiting for audio and movement";
+    if (!audio) return "Waiting for audio";
+    if (!motion) return "Waiting for movement";
+    if (this.calibrated) return "Detector active";
     const quietMs = Math.min(this.latest.audio, this.latest.motion) - this.quietStart;
-    if (quietMs < 0) return `Preparación · ${Math.ceil(-quietMs / 1000)} s`;
-    if (quietMs < 5000) return `Calibrando · ${Math.ceil((5000 - quietMs) / 1000)} s`;
-    return "Calibrando · esperando 20 muestras por sensor";
+    if (quietMs < 0) return `Get ready · ${Math.ceil(-quietMs / 1000)} s`;
+    if (quietMs < 5000) return `Calibrating (stay still) · ${Math.ceil((5000 - quietMs) / 1000)} s`;
+    return "Calibrating · waiting for 20 samples per sensor";
   }
 
   private acceptTime(sensor: Sensor, ms: number): boolean {

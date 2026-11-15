@@ -27,7 +27,7 @@ describe("importing Proyecto 2 experiment folders", () => {
   });
   it("opens an empty session and rejects the experiments parent folder", async () => {
     expect((await openExperiment([sessionFile("ground_truth.csv", header)])).labels).toEqual([]);
-    await expect(openExperiment([sessionFile("unrelated/ground_truth.csv", header)])).rejects.toThrow("una sola sesión");
+    await expect(openExperiment([sessionFile("unrelated/ground_truth.csv", header)])).rejects.toThrow("single session");
   });
   it("reads quoted fields and refuses mismatched columns", () => {
     expect(parseTable('\uFEFFkey,note\r\n1,"a, ""b"""\r\n', ["key", "note"], "test.csv"))
@@ -39,6 +39,6 @@ describe("importing Proyecto 2 experiment folders", () => {
     expect(readMotion(columns + "-0.002,1234.0,1.0,0,0.2,-3.2,4.5,0")).toEqual([
       { seconds: -0.002, axes: [1, 0, 0.2, -3.2, 4.5, 0] },
     ]);
-    expect(() => readMotion(columns + "0,1,2,3,4,5,,7")).toThrow("inválida");
+    expect(() => readMotion(columns + "0,1,2,3,4,5,,7")).toThrow("invalid");
   });
 });

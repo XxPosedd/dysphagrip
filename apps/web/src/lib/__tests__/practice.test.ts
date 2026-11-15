@@ -42,7 +42,7 @@ describe("pulsos simulados", () => {
     const folder = file.filename.slice(0, -4);
     const rows = unzipSync(file.data);
     expect(Object.keys(rows)).toHaveLength(4);
-    expect(strFromU8(rows[folder + "/summary.csv"])).toContain("SIMULACIÓN");
+    expect(strFromU8(rows[folder + "/summary.csv"])).toContain("SIMULATION");
     expect(strFromU8(rows[folder + "/ground_truth.csv"])).toContain("0.11,head_movement");
     expect(strFromU8(rows[folder + "/matches.csv"])).toContain("1,1,head_movement,-0.01,false_positive_control");
     expect(strFromU8(rows[folder + "/predictions.csv"])).toContain("0.1,,\r\n");

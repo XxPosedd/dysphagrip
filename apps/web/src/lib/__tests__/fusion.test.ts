@@ -38,8 +38,8 @@ describe("Proyecto 2 fusion", () => {
       const preparing = ms < 7050;
       detector.onAudio(ms, preparing ? 0.8 : 0.001);
       detector.onMotion(ms, motion(ms, preparing ? 15 : 0));
-      if (ms === 6050) expect(detector.status(ms)).toContain("Preparación");
-      if (ms === 9050) expect(detector.status(ms)).toContain("Calibrando");
+      if (ms === 6050) expect(detector.status(ms)).toContain("Get ready");
+      if (ms === 9050) expect(detector.status(ms)).toContain("Calibrating");
     }
     expect(detector.calibrated).toBe(true);
     detector.onAudio(12100, 0.005);

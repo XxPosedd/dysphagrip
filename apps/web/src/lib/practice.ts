@@ -1,11 +1,11 @@
 import { strToU8, zipSync } from "fflate";
 
 export const PRACTICE_ACTIONS = [
-  { key: "1", category: "swallowing_saliva", title: "Saliva" },
-  { key: "2", category: "swallowing_water", title: "Agua" },
-  { key: "3", category: "speaking", title: "Hablar" },
-  { key: "4", category: "head_movement", title: "Mover la cabeza" },
-  { key: "5", category: "coughing", title: "Toser" },
+  { key: "1", category: "swallowing_saliva", title: "Saliva swallow" },
+  { key: "2", category: "swallowing_water", title: "Water sip" },
+  { key: "3", category: "speaking", title: "Speaking" },
+  { key: "4", category: "head_movement", title: "Head movement" },
+  { key: "5", category: "coughing", title: "Voluntary cough" },
 ] as const;
 
 export type Category = typeof PRACTICE_ACTIONS[number]["category"];
@@ -104,11 +104,11 @@ function csv(rows: (string | number | null)[][]) {
 }
 
 export function archiveExperiment(session: ExperimentSession, source: "device" | "simulation" | "file") {
-  if (session.duration === null) throw new Error("Finaliza la sesión para exportarla.");
+  if (session.duration === null) throw new Error("Finish the session before exporting it.");
   const provenance = {
-    simulation: ["practica-simulada", "SIMULACIÓN. Pulsos sintéticos sin mediciones físicas. Práctica de coincidencias y etiquetado."],
-    device: ["experimento", "Candidatos experimentales por coincidencia de audio y movimiento."],
-    file: ["experimento-reproduccion", "Reproducción de archivo. Candidatos experimentales por coincidencia de audio y movimiento."],
+    simulation: ["practice-simulated", "SIMULATION. Synthetic pulses, no physical measurements. Coincidence and labelling practice."],
+    device: ["experiment", "Experimental candidates from audio and movement coincidence."],
+    file: ["experiment-playback", "File playback. Experimental candidates from audio and movement coincidence."],
   }[source];
   const result = scorePractice(session);
   const timestamp = (ms: number) => new Date(session.startedAt + ms).toISOString();

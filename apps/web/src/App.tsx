@@ -278,23 +278,23 @@ export default function App() {
         {source.overflows ? ` · ${source.overflows} overflows` : ""}</p>}
       {audio.error && <div className="banner-error" role="alert">{audio.error}</div>}
 
-      <section className="card" lang="es" aria-label="Experimento de Proyecto 2">
-        <header className="card-head"><h2>Proyecto 2 · Audio y movimiento</h2>
+      <section className="card" aria-label="Coincidence detector">
+        <header className="card-head"><h2>Coincidence detector · audio + movement (experimental)</h2>
           <Chip tone={observing ? "good" : "neutral"}>{recording && recorder
-            ? (audio.connection === "open" ? recorder.fusion.status(elapsed) : "Servicio desconectado")
-            : recorder ? "Sesión terminada" : "Sin sesión"}</Chip>
+            ? (audio.connection === "open" ? recorder.fusion.status(elapsed) : "Service disconnected")
+            : recorder ? "Session finished" : "No session"}</Chip>
         </header>
-        <p className="muted small">Conecta el micrófono de contacto y el MPU6050 e inicia una sesión.
-          Deja pasar los 3 segundos de preparación y mantén ambos en reposo durante los 5 segundos de calibración. El detector marca un candidato cuando los dos
-          superan sus umbrales con una diferencia de hasta 0.65 s. Registra cada acción realizada con su botón o tecla.</p>
-        <div className="row" role="group" aria-label="Marcar una observación">
+        <p className="muted small">Connect the contact microphone and the MPU-6050, then start a session.
+          Wait out the 3 s get-ready period and keep both sensors still for the 5 s calibration. The detector marks a candidate when both
+          exceed their thresholds within 0.65 s of each other. It is an experimental coincidence heuristic, not swallow detection. Log each action with its button or key.</p>
+        <div className="row" role="group" aria-label="Mark an observation">
           {PRACTICE_ACTIONS.map(action => <button key={action.key} className="btn btn-sm"
             disabled={!observing} onClick={() => markObservation(action.category)}><kbd>{action.key}</kbd> {action.title}</button>)}
         </div>
         {recording && audio.latest && audio.latest.features.raw_rms === undefined &&
-          <p role="status" className="muted small">Actualiza el servicio de audio de esta rama para recibir el RMS de Proyecto 2.</p>}
-        {recorder && <p className="muted small">Candidatos por coincidencia: {recorder.experiment.candidates.length}
-          {" · "}Observaciones manuales: {recorder.experiment.marks.length}</p>}
+          <p role="status" className="muted small">Restart the audio service from this version to receive the raw RMS feature the detector needs.</p>}
+        {recorder && <p className="muted small">Coincidence candidates: {recorder.experiment.candidates.length}
+          {" · "}Manual observations: {recorder.experiment.marks.length}</p>}
         {recorder && !recording && <button className="btn btn-sm" onClick={() =>
           downloadExperiment(recorder.experiment, recorder.source?.kind === "file" ? "file" : "device")}>
           Descargar informe del experimento (.zip)</button>}

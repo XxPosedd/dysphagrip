@@ -28,16 +28,18 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   }
 }
 
-const monitor = new URLSearchParams(window.location.search).get("vista") === "monitor";
-document.documentElement.lang = monitor ? "en" : "es";
-document.title = monitor ? "DysphaGrip · Live monitor" : "Proyecto 2 · DysphaGrip";
+// The live monitor is the default page; the signal lab is at ?view=lab (legacy ?vista=monitor still opens the monitor).
+const params = new URLSearchParams(window.location.search);
+const monitor = params.get("view") !== "lab";
+document.documentElement.lang = "en";
+document.title = monitor ? "DysphaGrip — Experimental Signal Monitor" : "Signal lab · DysphaGrip";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       {monitor ? <>
-        <nav className="monitor-return"><a href="?">← Laboratorio de Proyecto 2</a></nav>
-        <React.Suspense fallback={<p role="status" className="app">Abriendo monitor…</p>}><Monitor /></React.Suspense>
+        <nav className="monitor-return"><a href="?view=lab">Signal lab (practice and session review) →</a></nav>
+        <React.Suspense fallback={<p role="status" className="app">Opening monitor…</p>}><Monitor /></React.Suspense>
       </> : <Laboratorio />}
     </ErrorBoundary>
   </React.StrictMode>,

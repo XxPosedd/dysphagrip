@@ -9,11 +9,11 @@ function categoryName(category: string) {
 
 function number(value: string | undefined, digits = 2) {
   return value?.trim() && Number.isFinite(Number(value))
-    ? Number(value).toLocaleString("es-MX", { maximumFractionDigits: digits }) : "—";
+    ? Number(value).toLocaleString(undefined, { maximumFractionDigits: digits }) : "—";
 }
 
 function MotionPlot({ samples, rotation }: { samples: MotionSample[]; rotation: boolean }) {
-  const title = rotation ? "Giro (°/s)" : "Aceleración (g)";
+  const title = rotation ? "Rotation (°/s)" : "Acceleration (g)";
   const offset = rotation ? 3 : 0;
   const limit = samples.reduce((max, { axes }) =>
     Math.max(max, ...axes.slice(offset, offset + 3).map(Math.abs)), 0) || 1;
@@ -23,7 +23,7 @@ function MotionPlot({ samples, rotation }: { samples: MotionSample[]; rotation: 
   return <figure className="exp-plot">
     <figcaption>{title}</figcaption>
     <div className="exp-chart-range"><span>+{limit.toPrecision(3)}</span><span>−{limit.toPrecision(3)}</span></div>
-    <svg viewBox="0 0 400 90" preserveAspectRatio="none" role="img" aria-label={title + " en los ejes X, Y y Z"}>
+    <svg viewBox="0 0 400 90" preserveAspectRatio="none" role="img" aria-label={title + " on the X, Y and Z axes"}>
       <line x1="0" y1="45" x2="400" y2="45" />
       <line x1={x(0)} y1="0" x2={x(0)} y2="90" strokeDasharray="3 3" />
       {[0, 1, 2].map((axis) => {
@@ -34,7 +34,7 @@ function MotionPlot({ samples, rotation }: { samples: MotionSample[]; rotation: 
               vectorEffect="non-scaling-stroke" points={points.map((p) => p.join(",")).join(" ")} />;
       })}
     </svg>
-    <div className="exp-chart-time"><span>{start} s</span><span>Marca · 0 s</span><span>+{end} s</span></div>
+    <div className="exp-chart-time"><span>{start} s</span><span>Mark · 0 s</span><span>+{end} s</span></div>
   </figure>;
 }
 
@@ -69,14 +69,14 @@ function AudioPlot({ file, start }: { file: File; start: number }) {
   }, [file, start]);
   if (!plot) return null;
   return <figure className="exp-plot">
-    <figcaption>Audio del micrófono · amplitud normalizada</figcaption>
+    <figcaption>Microphone audio · normalised amplitude</figcaption>
     <div className="exp-chart-range"><span>+{plot.limit.toPrecision(3)}</span><span>−{plot.limit.toPrecision(3)}</span></div>
-    <svg viewBox="0 0 400 90" preserveAspectRatio="none" role="img" aria-label="Envolvente de audio respecto a la marca">
+    <svg viewBox="0 0 400 90" preserveAspectRatio="none" role="img" aria-label="Audio envelope around the mark">
       <line x1="0" y1="45" x2="400" y2="45" />
       <path d={plot.path} fill="none" stroke="var(--series-audio)" vectorEffect="non-scaling-stroke" />
       <line x1="200" y1="0" x2="200" y2="90" strokeDasharray="3 3" />
     </svg>
-    <div className="exp-chart-time"><span>−2 s</span><span>Marca · 0 s</span><span>+2 s</span></div>
+    <div className="exp-chart-time"><span>−2 s</span><span>Mark · 0 s</span><span>+2 s</span></div>
   </figure>;
 }
 
@@ -104,8 +104,8 @@ function Capture({ session, label }: { session: Experiment; label: CsvRow }) {
       ]);
       if (!active) return;
       const errors = [];
-      if (trace.status === "rejected") errors.push("No se pudo leer motion.csv.");
-      if (info.status === "rejected") errors.push("No se pudo leer metadata.json.");
+      if (trace.status === "rejected") errors.push("Could not read motion.csv.");
+      if (info.status === "rejected") errors.push("Could not read metadata.json.");
       setCapture({
         samples: trace.status === "fulfilled" ? trace.value : [],
         metadata: info.status === "fulfilled" && info.value && typeof info.value === "object" ? info.value : null,
@@ -115,25 +115,25 @@ function Capture({ session, label }: { session: Experiment; label: CsvRow }) {
     void load();
     return () => { active = false; };
   }, [motion, meta]);
-  if (!wav && !motion && !meta) return <p className="muted">Esta marca se guardó sin archivos de captura.</p>;
-  if (!capture) return <p role="status">Leyendo captura…</p>;
+  if (!wav && !motion && !meta) return <p className="muted">This mark was saved without capture files.</p>;
+  if (!capture) return <p role="status">Reading capture…</p>;
   const { samples, metadata, errors } = capture;
   return <div className="exp-capture">
-    {metadata?.closed_before_window_end === true && <p>La sesión terminó antes de completar la ventana de esta marca.</p>}
+    {metadata?.closed_before_window_end === true && <p>The session ended before this mark's window was complete.</p>}
     {typeof metadata?.audio_recorded_frames === "number" && typeof metadata.sample_rate_hz === "number" && metadata.sample_rate_hz > 0 &&
-      <p className="muted">Audio registrado · {metadata.audio_recorded_frames.toLocaleString("es-MX")} muestras a {metadata.sample_rate_hz.toLocaleString("es-MX")} Hz
+      <p className="muted">Recorded audio · {metadata.audio_recorded_frames.toLocaleString()} samples at {metadata.sample_rate_hz.toLocaleString()} Hz
         {Array.isArray(metadata.audio_missing_intervals_seconds_from_mark) && metadata.audio_missing_intervals_seconds_from_mark.length > 0
-          ? ` · ${metadata.audio_missing_intervals_seconds_from_mark.length} intervalos sin audio` : ""}</p>}
+          ? ` · ${metadata.audio_missing_intervals_seconds_from_mark.length} gaps without audio` : ""}</p>}
     {wav && typeof metadata?.wav_start_seconds_from_mark === "number" &&
       <AudioPlot file={wav} start={metadata.wav_start_seconds_from_mark} />}
     {audioUrl && metadata?.audio_recorded_frames !== 0
-      ? <audio controls preload="metadata" src={audioUrl} aria-label="Audio de la marca" />
-      : <p className="muted">Sin audio registrado.</p>}
+      ? <audio controls preload="metadata" src={audioUrl} aria-label="Audio around the mark" />
+      : <p className="muted">No audio recorded.</p>}
     {samples.length ? <>
       <div className="exp-traces"><MotionPlot samples={samples} rotation={false} /><MotionPlot samples={samples} rotation /></div>
       <div className="legend"><span>{samples.length} muestras</span>{["X", "Y", "Z"].map((axis, index) =>
         <span key={axis}><i className="sw line" style={{ background: `var(--series-${index + 1})` }} />{axis}</span>)}</div>
-    </> : <p className="muted">Sin muestras de movimiento.</p>}
+    </> : <p className="muted">No movement samples.</p>}
     {errors.map((error) => <p key={error} className="error" role="alert">{error}</p>)}
   </div>;
 }
@@ -146,21 +146,21 @@ function Report({ session }: { session: Experiment }) {
   const matchByPrediction = new Map(matches?.map((m) => [m.prediction_id, m]));
   const marked = new Map(matches?.map((m) => [m.label_id, m]));
   const categories = [...new Set(labels.map((item) => item.category))];
-  const simulated = summary?.disclaimer?.startsWith("SIMULACIÓN");
+  const simulated = /^SIMULA(CIÓN|TION)/.test(summary?.disclaimer ?? "");
   return <>
     <section className="card">
-      <div className="card-head"><h2>{session.name}</h2>{simulated && <strong>Simulación</strong>}</div>
+      <div className="card-head"><h2>{session.name}</h2>{simulated && <strong>Simulation (synthetic)</strong>}</div>
       {summary ? <>
         <div className="metrics">
-          {([["true_positives", "Aciertos"], ["false_positives", "Falsas alarmas"], ["false_negatives", "Omisiones"],
-            ["precision", "Precisión"], ["recall", "Sensibilidad"], ["f1", "F1"]] as const).map(([field, title]) =>
+          {([["true_positives", "Hits"], ["false_positives", "False alarms"], ["false_negatives", "Misses"],
+            ["precision", "Precision"], ["recall", "Recall"], ["f1", "F1"]] as const).map(([field, title]) =>
             <div key={field} className="metric"><span>{title}</span><strong>{number(summary[field])}</strong></div>)}
         </div>
-        <p className="exp-details muted">Duración {number(summary.duration_seconds)} s · Tolerancia {number(summary.tolerance_seconds)} s</p>
-      </> : <p className="muted">La carpeta aún no contiene un resumen de la sesión.</p>}
+        <p className="exp-details muted">Duration {number(summary.duration_seconds)} s · Tolerance {number(summary.tolerance_seconds)} s</p>
+      </> : <p className="muted">This folder has no session summary yet.</p>}
       {categories.length > 0 && <div className="exp-scroll"><table>
-        <caption>Comparación por acción</caption>
-        <thead><tr><th>Acción</th><th>Marcas</th><th>Con detección</th><th>Sin detección</th></tr></thead>
+        <caption>Comparison by action</caption>
+        <thead><tr><th>Action</th><th>Marks</th><th>Detected</th><th>Not detected</th></tr></thead>
         <tbody>{categories.map((cat) => {
           const group = labels.filter((row) => row.category === cat);
           const detected = group.filter((row) => marked.has(row.label_id)).length;
@@ -170,27 +170,27 @@ function Report({ session }: { session: Experiment }) {
       </table></div>}
     </section>
     <section className="card exp-capture">
-      <div className="card-head"><h2>Capturas por marca</h2></div>
+      <div className="card-head"><h2>Captures by mark</h2></div>
       {label ? <>
-        <label>Marca registrada<select value={selected} onChange={(event) => setSelected(event.target.value)}>
+        <label>Recorded mark<select value={selected} onChange={(event) => setSelected(event.target.value)}>
           {labels.map((item) => <option key={item.label_id} value={item.label_id}>#{item.label_id} · {categoryName(item.category)}</option>)}
         </select></label>
-        <p className="muted">{label.timestamp} · {match ? `Evento #${match.prediction_id} · diferencia ${number(match.latency_seconds, 3)} s`
-          : matches ? "Sin detección asociada" : "Correspondencias pendientes"}</p>
+        <p className="muted">{label.timestamp} · {match ? `Event #${match.prediction_id} · offset ${number(match.latency_seconds, 3)} s`
+          : matches ? "No matching detection" : "Matches pending"}</p>
         <Capture key={selected} session={session} label={label} />
-      </> : <p className="muted">La sesión no contiene marcas manuales.</p>}
+      </> : <p className="muted">This session has no manual marks.</p>}
     </section>
     <section className="card">
-      <div className="card-head"><h2>Eventos del detector</h2></div>
+      <div className="card-head"><h2>Detector events</h2></div>
       {predictions?.length ? <div className="exp-scroll"><table>
-        <thead><tr><th>Evento</th><th>Instante</th><th>Audio RMS</th><th>Actividad IMU</th><th>Marca asociada</th></tr></thead>
+        <thead><tr><th>Event</th><th>Time</th><th>Audio RMS</th><th>IMU activity</th><th>Matched mark</th></tr></thead>
         <tbody>{predictions.map((item) => {
           const linked = matchByPrediction.get(item.event_id);
           return <tr key={item.event_id}><th scope="row">#{item.event_id}</th><td>{item.timestamp}</td>
             <td>{number(item.audio_rms, 5)}</td><td>{number(item.imu_activity, 5)}</td>
-            <td>{linked ? `#${linked.label_id} · ${categoryName(linked.category)}` : matches ? "Sin marca" : "Pendiente"}</td></tr>;
+            <td>{linked ? `#${linked.label_id} · ${categoryName(linked.category)}` : matches ? "No mark" : "Pending"}</td></tr>;
         })}</tbody>
-      </table></div> : <p className="muted">{predictions ? "La sesión no registró eventos." : "La carpeta aún no contiene predictions.csv."}</p>}
+      </table></div> : <p className="muted">{predictions ? "The session recorded no events." : "This folder has no predictions.csv yet."}</p>}
     </section>
   </>;
 }
@@ -210,21 +210,21 @@ export default function Proyecto2() {
       const next = await openExperiment(files);
       setSession(next);
       setVersion((previous) => previous + 1);
-    } catch (e) { setError(e instanceof Error ? e.message : "No se pudo leer la carpeta."); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not read the folder."); }
     finally { setLoading(false); }
   }
 
-  return <div className="exp-view" lang="es">
+  return <div className="exp-view">
     <section className="card exp-import">
-      <div><h2>Revisar un experimento</h2>
-        <p className="muted">Selecciona la carpeta de una sesión de Proyecto 2 que contenga <code>ground_truth.csv</code>.
+      <div><h2>Review an experiment</h2>
+        <p className="muted">Select a session folder that contains <code>ground_truth.csv</code>.
           Los archivos se leen en este navegador.</p></div>
       <input hidden type="file" multiple {...{ webkitdirectory: "" }} ref={input} onChange={(e) => {
         void select(Array.from(e.target.files ?? []));
         e.target.value = "";
       }} />
       <button className="btn btn-primary" disabled={loading} onClick={() => input.current?.click()}>
-        {loading ? "Leyendo…" : session ? "Cambiar carpeta" : "Abrir carpeta"}
+        {loading ? "Reading…" : session ? "Change folder" : "Open folder"}
       </button>
     </section>
     {error && <p className="banner-error" role="alert">{error}</p>}

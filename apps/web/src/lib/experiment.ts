@@ -28,7 +28,7 @@ export function parseTable(text: string, required: string[], source: string): Cs
   if (quoted || new Set(headers).size !== headers.length ||
       !required.every((key) => headers.includes(key)) ||
       lines.some((r) => r.length !== headers.length)) {
-    throw new Error(`Revisa el formato de ${source}. Se esperaba el CSV de Proyecto 2.`);
+    throw new Error(`Check the format of ${source}: expected the coincidence-experiment CSV.`);
   }
   return lines.map((values) => Object.fromEntries(headers.map((h, i) => [h, values[i]])));
 }
@@ -49,7 +49,7 @@ export async function openExperiment(selection: File[]): Promise<Experiment> {
     files.set(full.slice(full.indexOf("/") + 1), file);
   }
   if (!files.has("ground_truth.csv")) {
-    throw new Error("Elige la carpeta de una sola sesión, la que contiene ground_truth.csv.");
+    throw new Error("Choose the folder of a single session (the one containing ground_truth.csv).");
   }
   async function table(name: string, fields: string[]) {
     const file = files.get(name);
@@ -63,11 +63,11 @@ export async function openExperiment(selection: File[]): Promise<Experiment> {
   ]);
   const ids = labels!.map((label) => label.label_id);
   if (ids.some((id) => !/^\d+$/.test(id)) || new Set(ids).size !== ids.length) {
-    throw new Error("ground_truth.csv contiene identificadores de marca inválidos o repetidos.");
+    throw new Error("ground_truth.csv contains invalid or duplicate mark IDs.");
   }
   return {
     labels: labels!, predictions, matches, summary: summary?.[0] ?? null, files,
-    name: selection[0]?.webkitRelativePath.split("/")[0] || "Sesión importada",
+    name: selection[0]?.webkitRelativePath.split("/")[0] || "Imported session",
   };
 }
 
@@ -77,7 +77,7 @@ export function readMotion(csv: string) {
   return parseTable(csv, ["seconds_from_mark", ...MOTION_AXES], "motion.csv").map((row) => {
     const raw = [row.seconds_from_mark, ...MOTION_AXES.map((axis) => row[axis])];
     if (raw.some((v) => !v.trim() || !Number.isFinite(Number(v)))) {
-      throw new Error("motion.csv contiene una lectura de movimiento inválida.");
+      throw new Error("motion.csv contains an invalid movement reading.");
     }
     const [seconds, ...axes] = raw.map(Number);
     return { seconds, axes };

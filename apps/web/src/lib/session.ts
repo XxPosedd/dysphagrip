@@ -148,7 +148,7 @@ export class SessionRecorder {
     const id = this.experiment.candidates.length + 1;
     this.experiment.candidates.push({ id, ms: event.ms, audioRms: event.audioRms, imuActivity: event.imuActivity });
     this.emit({ id: newId(), kind: "possible_swallow_event", t_ms: event.ms,
-      label: "Posible deglución", note: `Audio + MPU6050 · Δt ${Math.round(event.gapMs)} ms` });
+      label: "Candidate swallow-like event (experimental)", note: `Audio + MPU-6050 coincidence · Δt ${Math.round(event.gapMs)} ms` });
   }
 
   markObservation(category: Category, ms: number) {

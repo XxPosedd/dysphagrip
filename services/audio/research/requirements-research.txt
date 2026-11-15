@@ -1,0 +1,4 @@
+# Research-only extras (not needed to run DysphaGrip)
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4

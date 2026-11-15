@@ -63,20 +63,20 @@ export default function Practice() {
   return <section ref={panel} className="card practice" aria-labelledby="practice-heading">
     <div className="practice-heading">
       <div>
-        <h2 id="practice-heading">Mesa de simulación</h2>
-        <p className="muted">Genera pulsos de audio y movimiento para probar el detector sin conectar sensores.</p>
+        <h2 id="practice-heading">Simulation bench <small>(synthetic signals, not measurements)</small></h2>
+        <p className="muted">Generate audio and movement pulses to test the detector without sensors.</p>
       </div>
       {active
-        ? <button className="btn btn-ghost" onClick={finish}>Finalizar práctica</button>
-        : <button className="btn btn-primary" onClick={start}>{session ? "Nueva práctica" : "Iniciar práctica"}</button>}
+        ? <button className="btn btn-ghost" onClick={finish}>Finish practice</button>
+        : <button className="btn btn-primary" onClick={start}>{session ? "New practice" : "Start practice"}</button>}
     </div>
 
     {session && <>
       <div className="practice-monitor">
-        <div className="practice-monitor-head"><h3>Pulsos simulados</h3><strong className="tabular">{seconds(elapsed)}</strong></div>
+        <div className="practice-monitor-head"><h3>Simulated pulses</h3><strong className="tabular">{seconds(elapsed)}</strong></div>
         {(["audio", "motion"] as const).map(channel =>
           <div className="practice-trace" key={channel}>
-            <span>{channel === "audio" ? "Audio" : "Movimiento"}</span>
+            <span>{channel === "audio" ? "Audio" : "Movement"}</span>
             <div className="practice-track" aria-hidden="true">
               {session.recentPulses.filter(p => p.channel === channel && p.ms >= left).map((p, i) =>
                 <i key={i} className={channel} style={{ left: (p.ms - left) / 100 + "%" }} />)}
@@ -87,33 +87,33 @@ export default function Practice() {
 
       {active && <div className="practice-work">
         <div>
-          <h3>Generar pulsos</h3>
-          <p>Dos pulsos de canales distintos en un intervalo de hasta 0,65 s generan un candidato. El detector vuelve a aceptar pulsos tras 1,5 s.</p>
+          <h3>Generate pulses</h3>
+          <p>Two pulses on different channels within 0.65 s create a candidate. The detector accepts pulses again after 1.5 s.</p>
           <div className="row">
             <button className="btn btn-ghost btn-sm" onClick={() => pulse("audio")}>Audio</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => pulse("motion")}>Movimiento</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => pulse("both")}>Ambos a la vez</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => pulse("motion")}>Movement</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => pulse("both")}>Both at once</button>
           </div>
-          <p role="status">{lastCandidate ? "Candidatos: " + session.candidates.length + " · Último a " + seconds(lastCandidate.ms) : "Esperando la primera coincidencia."}</p>
+          <p role="status">{lastCandidate ? "Candidates: " + session.candidates.length + " · last at " + seconds(lastCandidate.ms) : "Waiting for the first coincidence."}</p>
         </div>
         <div>
-          <h3>Marcar una acción</h3>
-          <p>Elige la acción que representa el ensayo o pulsa su tecla. Puedes marcarla incluso si el detector guarda silencio.</p>
+          <h3>Mark an action</h3>
+          <p>Choose the action this trial represents, or press its key. You can mark it even if the detector stays silent.</p>
           <div className="row">{PRACTICE_ACTIONS.map(action =>
             <button key={action.key} className="btn btn-ghost btn-sm" onClick={() => mark(action.category)}>
               {action.title}<kbd>{action.key}</kbd>
             </button>)}</div>
-          <p role="status">{lastMark ? "Marcas: " + session.marks.length + " · " + nameOf(lastMark.category) + " a " + seconds(lastMark.ms) : "Aún no hay marcas."}</p>
+          <p role="status">{lastMark ? "Marks: " + session.marks.length + " · " + nameOf(lastMark.category) + " at " + seconds(lastMark.ms) : "No marks yet."}</p>
         </div>
       </div>}
 
       {result && <div className="practice-report">
-        <h3>Resultado de la simulación</h3>
-        <p>Se compararon {session.candidates.length} candidatos y {session.marks.length} marcas con una tolerancia de ±1,5 s. Saliva y agua son las dos etiquetas positivas.</p>
-        <div className="metrics">{[["Aciertos", result.tp], ["Falsas alarmas", result.fp], ["Omisiones", result.fn]].map(([label, value]) =>
+        <h3>Simulation result</h3>
+        <p>Compared {session.candidates.length} candidates with {session.marks.length} marks at ±1.5 s tolerance. Saliva swallow and water sip are the two positive labels.</p>
+        <div className="metrics">{[["Hits", result.tp], ["False alarms", result.fp], ["Misses", result.fn]].map(([label, value]) =>
           <div key={label} className="metric"><span>{label}</span><strong>{value}</strong></div>)}</div>
-        <button className="btn btn-ghost" onClick={() => downloadExperiment(session, "simulation")}>Descargar CSV de práctica (.zip)</button>
-        <p className="muted small">Descomprime el ZIP para abrir la carpeta en el visor de sesiones.</p>
+        <button className="btn btn-ghost" onClick={() => downloadExperiment(session, "simulation")}>Download practice CSVs (.zip)</button>
+        <p className="muted small">Unzip it to open the folder in the session viewer.</p>
       </div>}
     </>}
   </section>;

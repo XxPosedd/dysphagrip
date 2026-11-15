@@ -8,32 +8,32 @@ export default function Laboratorio() {
     <div className="lab">
       <header className="lab-header">
         <span className="lab-brand">DysphaGrip</span>
-        <nav aria-label="Secciones del laboratorio">
-          <a href="#practica">Práctica</a>
-          <a href="#sesiones">Sesiones</a>
-          <a href="?vista=monitor" target="_blank" rel="noreferrer">Monitor en vivo ↗</a>
+        <nav aria-label="Lab sections">
+          <a href="#practica">Practice</a>
+          <a href="#sesiones">Sessions</a>
+          <a href="?">← Live monitor</a>
         </nav>
       </header>
       <main className="lab-main">
         <div className="lab-intro">
-          <span className="lab-project">Proyecto 2</span>
-          <h1>Laboratorio de señales</h1>
-          <p>Explora cómo coinciden el sonido del micrófono de contacto y el movimiento del MPU6050.
-            Puedes ensayar con señales simuladas o revisar una sesión guardada.</p>
+          <span className="lab-project">Experimental</span>
+          <h1>Signal lab</h1>
+          <p>Explore how contact-microphone sound and MPU-6050 movement coincide.
+            Practise with clearly labelled simulated signals, or review a saved session.</p>
         </div>
-        <section id="practica" aria-label="Práctica con señales simuladas"><Practice /></section>
-        <section id="sesiones" aria-label="Sesiones guardadas"><Proyecto2 /></section>
+        <section id="practica" aria-label="Practice with simulated signals"><Practice /></section>
+        <section id="sesiones" aria-label="Saved sessions"><Proyecto2 /></section>
         <details className="lab-reference" open>
-          <summary>Saliva y movimiento de cabeza · comparación del prototipo</summary>
+          <summary>Saliva swallow vs head movement · prototype comparison</summary>
           <figure>
             <img src={comparison} loading="lazy" width="1458" height="802"
-              alt="La marca 2 de saliva presenta un pico de audio sin detección. La marca 12 de movimiento de cabeza sí presenta una detección." />
-            <figcaption>Dos marcas de una sesión previa. El tiempo cero indica la etiqueta manual.
-              La línea naranja señala una detección durante el movimiento de cabeza.</figcaption>
+              alt="Saliva mark 2 shows an audio peak without a detection. Head-movement mark 12 does show a detection." />
+            <figcaption>Two marks from an earlier session (chart labels in Spanish). Time zero is the manual label.
+              The orange line marks a detection during head movement.</figcaption>
           </figure>
         </details>
       </main>
-      <footer className="lab-footer">Prototipo experimental de DysphaGrip. Los eventos candidatos requieren revisión y carecen de validación clínica.</footer>
+      <footer className="lab-footer">Experimental DysphaGrip prototype. Candidate events need review and have no clinical validation.</footer>
     </div>
   );
 }

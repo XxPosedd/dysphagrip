@@ -61,8 +61,10 @@ MPU-6050 → UNO Q ─USB/TCP─┘     signal processing + shared clock        
   - **Quality rules**: no_signal / clipping / mains_hum / ok, each with a human-readable reason.
 - **processor.py**: every 50 ms takes the new samples and builds one **frame**: a 200-point waveform
   envelope, a 128-bin spectrogram column, the features, the quality and timestamps.
-- **motion.py** *(in progress)*: parses the IMU lines, maps board time to Mac time (**ClockSync**), and
-  runs the **movement-interference detector**.
+- **motion.py**: reads the IMU lines over USB serial or TCP (auto-reconnect), maps board time to Mac
+  time (**ClockSync**), keeps timestamps strictly increasing, and runs the **movement-interference detector**:
+  the RMS of gyro magnitude and of gravity-removed acceleration over 200 ms, which must exceed thresholds
+  for 150 ms to start an episode and stay below them for 400 ms to end it.
 - **server.py**: FastAPI app. REST endpoints to list devices and start/stop capture, and a **WebSocket**
   (`/stream`) that pushes ~20 frames per second to the dashboard. Only localhost pages may connect.
 
@@ -162,6 +164,18 @@ non-medical list, so the endpoint can't be abused or give advice.
 
 **What does Neon do?**
 It stores sessions, markers and quality summaries (one transaction per save) and the public resources.
+
+**Can Bright Data pull datasets comparing healthy people with dysphagia patients?**
+No. Patient sensor recordings are clinical research data held under data-use agreements and ethics approvals
+(e.g. credentialed repositories), not public web pages. Scraping them would breach terms and patient privacy.
+The legitimate route is applying for access or partnering with a research group. Even then, data from
+different sensors wouldn't transfer directly, and separating "normal" from "dysphagia" is a clinical claim
+we deliberately don't make.
+
+**How does the motion sensor connect, and how do you know it's working?**
+The firmware prints a `hello` line with the chip's WHO_AM_I and sample rate, then 100 JSON samples a second.
+The dashboard shows "Motion: live", the rate, the clock-sync jitter and drift, and any lost samples
+(sequence numbers), so a broken sensor is visible, never silent.
 
 **Could this use ML?**
 Yes, as future work: start with a movement and bad-recording classifier trained on labelled volunteer

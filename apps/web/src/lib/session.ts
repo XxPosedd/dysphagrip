@@ -1,5 +1,5 @@
 import { ActivitySegmenter, QualityDebouncer } from "./events";
-import type { AudioFrame, AudioSourceInfo, EventMarker, QualityLabel, SessionPayload, SessionSummary, StoredSession, TimelinePoint } from "./types";
+import type { AudioFrame, AudioSourceInfo, EventMarker, MotionFrame, QualityLabel, SessionPayload, SessionSummary, StoredSession, TimelinePoint } from "./types";
 
 export const QUALITY_TEXT: Record<QualityLabel, string> = {
   ok: "Signal OK",
@@ -31,6 +31,12 @@ export class SessionRecorder {
   readonly onMarker: Array<(m: EventMarker) => void> = [];
   /** Called when the debounced (>= 1 s stable) quality label changes; `previous` is null for the first label. */
   readonly onQualityChange: Array<(label: QualityLabel, previous: QualityLabel | null) => void> = [];
+  /** Called when a movement-interference episode starts (for the voice cue). */
+  readonly onMovementStart: Array<() => void> = [];
+  /** Motion timeline: one point per motion frame (session ms, movement score, interference). */
+  readonly motionPoints: Array<{ t_ms: number; score: number; interference: boolean }> = [];
+  motionSamples = 0;
+  private interferenceSince: number | null = null;
 
   private segmenter = new ActivitySegmenter();
   private quality = new QualityDebouncer();
@@ -90,6 +96,40 @@ export class SessionRecorder {
     }
   }
 
+  /** Ingest one motion frame (timestamps are host Unix ms from the audio service's shared clock). */
+  ingestMotion(frame: MotionFrame): void {
+    if (!this.running || !frame.samples.length) return;
+    const t = frame.samples[frame.samples.length - 1].t_unix_ms - this.startedAtUnixMs;
+    if (t < 0) return;
+    this.motionSamples += frame.samples.length;
+    const active = frame.features.interference === true;
+    if (this.motionPoints.length >= this.maxPoints) this.motionPoints.shift();
+    this.motionPoints.push({ t_ms: t, score: frame.features.movement_score ?? 0, interference: active });
+    if (active && this.interferenceSince === null) {
+      this.interferenceSince = frame.samples[0].t_unix_ms - this.startedAtUnixMs;
+      this.onMovementStart.forEach((fn) => fn());
+    } else if (!active && this.interferenceSince !== null) {
+      this.closeInterference(t);
+    }
+  }
+
+  get motionConnected(): boolean {
+    return this.motionSamples > 0;
+  }
+
+  get currentInterference(): { start_ms: number; end_ms: number } | null {
+    const last = this.motionPoints[this.motionPoints.length - 1];
+    return this.interferenceSince === null || !last ? null : { start_ms: Math.max(0, this.interferenceSince), end_ms: last.t_ms };
+  }
+
+  private closeInterference(t: number) {
+    if (this.interferenceSince === null) return;
+    const start = Math.max(0, this.interferenceSince);
+    this.interferenceSince = null;
+    this.emit({ id: newId(), kind: "movement_interference", t_ms: start, duration_ms: Math.max(0, t - start),
+      label: "Movement interference" });
+  }
+
   addManualMarker(t_ms: number = this.lastT, note?: string): EventMarker {
     const m: EventMarker = { id: newId(), kind: "manual", t_ms, label: "Manual marker", note };
     this.emit(m);
@@ -102,6 +142,7 @@ export class SessionRecorder {
       const seg = this.segmenter.flush(t);
       if (seg) this.addActivityMarker(seg.start_ms, seg.end_ms);
       this.closeQualityEpisode(t);
+      this.closeInterference(t);
       this.endedAtUnixMs = endUnixMs;
     }
     return this.summary();

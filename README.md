@@ -14,7 +14,7 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 
 | Track | Contribution | Status |
 |---|---|---|
-| Best Overall Hack | End-to-end live audio + motion capture, synchronised dashboard, signal quality, history | Audio service ✅ · dashboard ✅ (audio) · motion 🚧 |
+| Best Overall Hack | End-to-end live audio + motion capture, synchronised dashboard, signal quality, history | Audio ✅ · dashboard ✅ · motion pipeline ✅ (hardware bring-up pending) |
 | Bright Data: Data for Good | Attributed US swallowing resources: Parkinson's Foundation and SPOHNC pages via **Bright Data Web Unlocker**, MedlinePlus EN/ES via its official API, with publisher, licence and retrieval date | ✅ Live: 5 resources in Neon, 3 collected through Bright Data |
 | ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Live: voice "Matilda", spoken cues verified in the dashboard |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
@@ -27,7 +27,7 @@ An integration is only claimed once it is implemented, tested and visible in the
 KORG CM-300 → UM2 ─USB─► services/audio (Python: sounddevice, NumPy, SciPy, FastAPI)
                               │  WebSocket :8765  audio_frame (waveform, spectrogram column, features, quality)
                               ▼
-Arduino UNO Q + MPU-6050 ─USB serial─► motion receiver (Phase 3)
+Arduino UNO Q + MPU-6050 ─USB serial / TCP relay─► same Python service (motion receiver + shared clock)
                               │
                               ▼
                     apps/web (React + Vite + TS) ◄──► server (Express + TS) ──► Neon Postgres
@@ -46,7 +46,7 @@ services/audio/           Python audio service (see its README)
   tests/                  pytest suite
 hardware/
   audio_um2_cm300/        UM2 + CM-300 wiring and settings
-  unoq_mpu6050/           motion sensor notes (firmware in Phase 3)
+  unoq_mpu6050/           MPU-6050 firmware, Linux-side TCP relay, wiring and bring-up guide
 docs/                     decisions, open questions, safety, demo script
 .vscode/                  launch configs and tasks
 ```
@@ -93,7 +93,7 @@ Open http://localhost:5173 with the audio service and `npm run dev` running.
 | Waveform | Last 5 s, auto-scaled min/max envelope |
 | Spectrogram | Last 15 s, 0–4 kHz, single-hue scale auto-ranged to the background; hover for frequency/dB |
 | Signal quality | Debounced OK / No signal / Clipping / Mains hum with reasons, level, floor, dominant frequency, hum, band energy |
-| Movement | MPU-6050 accel/gyro X/Y/Z. Shows "Not connected" (no fake values) until Phase 3 |
+| Movement | MPU-6050 accel/gyro X/Y/Z live values and traces, movement score, connect via USB serial or TCP relay, clock-sync health |
 | Session timeline | Whole session or last 30 s: level and noise floor, audio-activity segments, manual markers, quality strip, motion lane; hover crosshair |
 | Event markers | Manual markers (button or **M** key), automatic *audio activity (experimental)* segments, quality episodes |
 | Voice feedback | "Recording started", "Audio signal detected", quality warnings, "Session saved successfully". Always shown as text; spoken via ElevenLabs once configured |
@@ -201,8 +201,8 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 
 - [x] Phase 1: repository inspection, config fixes, test harness
 - [x] Phase 2: Python audio service (UM2 detection, device selection, capture, waveform, spectrogram, features)
-- [ ] Phase 3: MPU-6050 firmware + receiver
-- [ ] Phase 4: shared session clock
+- [x] Phase 3: MPU-6050 firmware + receiver (code + tests done; first hardware bring-up pending; see hardware/unoq_mpu6050)
+- [x] Phase 4: shared session clock (audio and motion on the Mac clock; minimum-latency offset, jitter and drift reported)
 - [x] Phase 5: React dashboard (audio side live; motion panels wait for Phase 3)
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
 - [x] Phase 7: ElevenLabs (live: cues spoken in a real session; allowlisted phrases, caching, rate limit)

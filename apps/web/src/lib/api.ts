@@ -1,5 +1,5 @@
 import { API_BASE, AUDIO_HTTP_BASE } from "./config";
-import type { ApiHealth, AudioDevice, AudioStatus, PublicResource, SessionPayload, StoredMarker, StoredSession } from "./types";
+import type { ApiHealth, AudioDevice, AudioStatus, MotionStatus, PublicResource, SerialPortInfo, SessionPayload, StoredMarker, StoredSession } from "./types";
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -38,6 +38,9 @@ export const audioApi = {
   start: (device: number | null, channel: number) =>
     request<AudioStatus>(`${AUDIO_HTTP_BASE}/start`, json({ device, channel })),
   stop: () => request<AudioStatus>(`${AUDIO_HTTP_BASE}/stop`, { method: "POST" }),
+  motionPorts: () => request<{ ports: SerialPortInfo[] }>(`${AUDIO_HTTP_BASE}/motion/ports`),
+  motionStart: (source: string) => request<MotionStatus>(`${AUDIO_HTTP_BASE}/motion/start`, json({ source })),
+  motionStop: () => request<MotionStatus>(`${AUDIO_HTTP_BASE}/motion/stop`, { method: "POST" }),
 };
 
 // ---- Express API ----

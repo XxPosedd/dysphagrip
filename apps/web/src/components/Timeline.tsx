@@ -136,8 +136,32 @@ export function Timeline({ recorder, tick, motionConnected }: {
       ctx.restore();
     }
 
-    ctx.fillStyle = t["text-muted"];
-    ctx.fillText(motionConnected ? "" : "MPU-6050 not connected: no motion data", GUTTER + 8, TRACKS.motion.y + TRACKS.motion.h / 2);
+    const motionPts = recorder?.motionPoints ?? [];
+    if (motionPts.length) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(GUTTER, TRACKS.motion.y, plotW, TRACKS.motion.h); ctx.clip();
+      // Movement-interference episodes: warning-coloured spans; movement score as a thin line.
+      const spans = (recorder?.markers ?? []).filter((m) => m.kind === "movement_interference")
+        .map((m) => ({ s: m.t_ms, e: m.t_ms + (m.duration_ms ?? 0) }));
+      const cur = recorder?.currentInterference;
+      if (cur) spans.push({ s: cur.start_ms, e: cur.end_ms });
+      ctx.fillStyle = t["status-warning"];
+      for (const { s, e } of spans) {
+        if (e < t0) continue;
+        ctx.beginPath(); ctx.roundRect(xOf(s) + 1, TRACKS.motion.y + 2, Math.max(3, xOf(e) - xOf(s) - 2), TRACKS.motion.h - 4, 4); ctx.fill();
+      }
+      ctx.strokeStyle = t["text-secondary"]; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      motionPts.filter((p) => p.t_ms >= t0 - 1000).forEach((p, i) => {
+        const yv = TRACKS.motion.y + TRACKS.motion.h - 2 - Math.min(1.5, p.score) / 1.5 * (TRACKS.motion.h - 4);
+        if (i) ctx.lineTo(xOf(p.t_ms), yv); else ctx.moveTo(xOf(p.t_ms), yv);
+      });
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = t["text-muted"];
+      ctx.fillText(motionConnected ? "Waiting for motion data…" : "MPU-6050 not connected: no motion data", GUTTER + 8, TRACKS.motion.y + TRACKS.motion.h / 2);
+    }
 
     // Time axis ticks
     ctx.textAlign = "center";
@@ -209,6 +233,8 @@ export function Timeline({ recorder, tick, motionConnected }: {
         <span><i className="sw" style={{ background: "var(--status-warning)" }} />Hum</span>
         <span><i className="sw" style={{ background: "var(--status-serious)" }} />Clipping</span>
         <span><i className="sw" style={{ background: "var(--status-critical)" }} />No signal</span>
+        <span><i className="sw line" style={{ background: "var(--text-secondary)" }} />Movement score</span>
+        <span><i className="sw" style={{ background: "var(--status-warning)" }} />Movement interference</span>
       </div>
     </figure>
   );

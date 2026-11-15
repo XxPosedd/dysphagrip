@@ -57,9 +57,53 @@ export interface AudioStatus {
   last_error: string | null;
 }
 
+/** One MPU-6050 sample, already mapped to host Unix time by the audio service. */
+export interface MotionSample {
+  t_unix_ms: number;
+  ax: number; ay: number; az: number;   // g
+  gx: number; gy: number; gz: number;   // degrees/second
+}
+
+export interface MotionFeatures {
+  accel_mag_g?: number;
+  accel_dyn_rms_g?: number;
+  gyro_rms_dps?: number;
+  movement_score?: number;
+  interference?: boolean;
+}
+
+export interface MotionFrame {
+  type: "motion_frame";
+  samples: MotionSample[];
+  features: MotionFeatures;
+}
+
+export interface MotionStatus {
+  running: boolean;
+  source?: string;
+  transport?: string;
+  connected?: boolean;
+  receiving?: boolean;
+  device?: { device?: string; fw?: string; addr?: string; whoami?: string; rate_hz?: number } | null;
+  device_errors?: string[];
+  last_error?: string | null;
+  samples_total?: number;
+  seq_gaps?: number;
+  parse_errors?: number;
+  sync?: { offset_ms: number | null; jitter_p95_ms: number | null; drift_ppm: number | null; board_resets?: number };
+}
+
+export interface SerialPortInfo {
+  device: string;
+  description: string;
+  likely_arduino: boolean;
+}
+
 export type AudioMessage =
+  | MotionFrame
+  | ({ type: "motion_status" } & MotionStatus)
   | AudioFrame
-  | ({ type: "hello" | "status" } & AudioStatus)
+  | ({ type: "hello" | "status"; motion?: MotionStatus } & AudioStatus)
   | { type: "error"; message: string };
 
 export interface AudioDevice {
@@ -72,7 +116,7 @@ export interface AudioDevice {
   um2_match: "strong" | "possible" | null;
 }
 
-export type MarkerKind = "manual" | "audio_activity" | "quality";
+export type MarkerKind = "manual" | "audio_activity" | "quality" | "movement_interference";
 
 export interface EventMarker {
   id: string;
@@ -134,7 +178,7 @@ export interface StoredSession {
 }
 
 export interface StoredMarker {
-  kind: MarkerKind | "movement_interference";
+  kind: MarkerKind;
   t_ms: number;
   duration_ms: number | null;
   label: string;

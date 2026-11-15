@@ -1,4 +1,4 @@
-import type { AudioFrame, AudioMessage, AudioStatus } from "./types";
+import type { AudioFrame, AudioMessage, AudioStatus, MotionFrame, MotionStatus } from "./types";
 
 /** Validate an incoming WebSocket payload. Returns null for anything malformed. */
 export function parseAudioMessage(raw: string): AudioMessage | null {
@@ -26,6 +26,14 @@ export function parseAudioMessage(raw: string): AudioMessage | null {
       return typeof msg.running === "boolean" ? (msg as unknown as AudioMessage) : null;
     case "error":
       return typeof msg.message === "string" ? (msg as unknown as AudioMessage) : null;
+    case "motion_frame": {
+      const samples = msg.samples as MotionFrame["samples"] | undefined;
+      if (!Array.isArray(samples) || !samples.every((s) => s && typeof s.t_unix_ms === "number" && typeof s.ax === "number")) return null;
+      if (!msg.features || typeof msg.features !== "object") return null;
+      return msg as unknown as MotionFrame;
+    }
+    case "motion_status":
+      return typeof msg.running === "boolean" ? (msg as unknown as AudioMessage) : null;
     default:
       return null;
   }
@@ -35,7 +43,9 @@ export type ConnectionState = "connecting" | "open" | "closed";
 
 export interface StreamHandlers {
   onFrame: (f: AudioFrame) => void;
-  onStatus: (s: AudioStatus) => void;
+  onStatus: (s: AudioStatus & { motion?: MotionStatus }) => void;
+  onMotionFrame?: (f: MotionFrame) => void;
+  onMotionStatus?: (s: MotionStatus) => void;
   onError: (message: string) => void;
   onConnection: (state: ConnectionState) => void;
 }
@@ -62,8 +72,13 @@ export class AudioStream {
       const m = parseAudioMessage(String(ev.data));
       if (!m) return;
       if (m.type === "audio_frame") this.h.onFrame(m);
+      else if (m.type === "motion_frame") this.h.onMotionFrame?.(m);
+      else if (m.type === "motion_status") this.h.onMotionStatus?.(m);
       else if (m.type === "error") this.h.onError(m.message);
-      else this.h.onStatus(m);
+      else {
+        this.h.onStatus(m);
+        if (m.type === "hello" && m.motion) this.h.onMotionStatus?.(m.motion);
+      }
     };
     ws.onclose = () => {
       this.h.onConnection("closed");

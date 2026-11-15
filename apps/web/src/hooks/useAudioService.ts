@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { audioApi, ApiError } from "../lib/api";
 import { audioWsUrl } from "../lib/config";
 import { AudioStream, type ConnectionState } from "../lib/stream";
-import type { AudioDevice, AudioFrame, AudioStatus } from "../lib/types";
+import type { AudioDevice, AudioFrame, AudioStatus, MotionFrame, MotionStatus, SerialPortInfo } from "../lib/types";
 
 export type FrameListener = (f: AudioFrame) => void;
+export type MotionListener = (f: MotionFrame) => void;
 
 /**
  * Connection to the Python audio service.
@@ -19,6 +20,12 @@ export function useAudioService() {
   const [error, setError] = useState<string | null>(null);
   const [latest, setLatest] = useState<AudioFrame | null>(null);
   const [busy, setBusy] = useState(false);
+  const [motion, setMotion] = useState<MotionStatus | null>(null);
+  const [motionLatest, setMotionLatest] = useState<MotionFrame | null>(null);
+  const [motionPorts, setMotionPorts] = useState<SerialPortInfo[]>([]);
+  const [motionError, setMotionError] = useState<string | null>(null);
+  const motionListeners = useRef(new Set<MotionListener>());
+  const lastMotionUi = useRef(0);
 
   const listeners = useRef(new Set<FrameListener>());
   const lastUiUpdate = useRef(0);
@@ -26,6 +33,37 @@ export function useAudioService() {
   const subscribe = useCallback((fn: FrameListener) => {
     listeners.current.add(fn);
     return () => void listeners.current.delete(fn);
+  }, []);
+
+  const subscribeMotion = useCallback((fn: MotionListener) => {
+    motionListeners.current.add(fn);
+    return () => void motionListeners.current.delete(fn);
+  }, []);
+
+  const refreshMotionPorts = useCallback(async () => {
+    try {
+      setMotionPorts((await audioApi.motionPorts()).ports);
+    } catch {
+      setMotionPorts([]);
+    }
+  }, []);
+
+  const startMotion = useCallback(async (source: string) => {
+    setMotionError(null);
+    try {
+      setMotion(await audioApi.motionStart(source));
+    } catch (e) {
+      setMotionError((e as Error).message);
+    }
+  }, []);
+
+  const stopMotion = useCallback(async () => {
+    try {
+      setMotion(await audioApi.motionStop());
+      setMotionLatest(null);
+    } catch (e) {
+      setMotionError((e as Error).message);
+    }
   }, []);
 
   const refreshDevices = useCallback(async () => {
@@ -47,6 +85,7 @@ export function useAudioService() {
         if (s === "open") {
           setError(null);
           void refreshDevices();
+          void refreshMotionPorts();
         }
       },
       onStatus: (s) => {
@@ -55,6 +94,18 @@ export function useAudioService() {
         if (s.last_error) setError(s.last_error);
       },
       onError: (m) => setError(m),
+      onMotionStatus: (s) => {
+        setMotion(s);
+        if (!s.running) setMotionLatest(null);
+      },
+      onMotionFrame: (f) => {
+        motionListeners.current.forEach((fn) => fn(f));
+        const now = performance.now();
+        if (now - lastMotionUi.current > 120) {
+          lastMotionUi.current = now;
+          setMotionLatest(f);
+        }
+      },
       onFrame: (f) => {
         listeners.current.forEach((fn) => fn(f));
         const now = performance.now();
@@ -66,7 +117,7 @@ export function useAudioService() {
     });
     stream.connect();
     return () => stream.close();
-  }, [refreshDevices]);
+  }, [refreshDevices, refreshMotionPorts]);
 
   // Self-heal: if connected but the device list is empty (e.g. the first request raced the
   // service start-up), retry every 3 s until devices appear.
@@ -103,7 +154,10 @@ export function useAudioService() {
     }
   }, []);
 
-  return { connection, status, devices, um2Candidate, error, latest, busy, subscribe, refreshDevices, start, stop };
+  return {
+    connection, status, devices, um2Candidate, error, latest, busy, subscribe, refreshDevices, start, stop,
+    motion, motionLatest, motionPorts, motionError, subscribeMotion, refreshMotionPorts, startMotion, stopMotion,
+  };
 }
 
 export type AudioService = ReturnType<typeof useAudioService>;

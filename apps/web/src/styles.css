@@ -229,3 +229,13 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: va
 .resource-title:hover, .resource-title:focus-visible { text-decoration: underline; color: var(--accent); }
 .resource-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-muted); margin-top: auto; }
 .via { font-weight: 600; color: var(--text-secondary); }
+
+/* ---------- Motion ---------- */
+.motion-controls { margin-bottom: 8px; }
+.motion-controls select { flex: 1; min-width: 0; }
+.text-input { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; min-width: 0; flex: 1; color: var(--text-primary); }
+.motion-traces { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.canvas-motion { height: 70px; }
+.motion-score { margin-top: 10px; }
+.metric strong small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+.kind-movement_interference { border-left-color: var(--status-warning); }

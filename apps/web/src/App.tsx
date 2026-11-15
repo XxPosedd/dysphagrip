@@ -3,7 +3,8 @@ import { ResourcesPanel } from "./components/Resources";
 import { Spectrogram } from "./components/Spectrogram";
 import { Timeline } from "./components/Timeline";
 import { Waveform } from "./components/Waveform";
-import { Chip, MarkerList, MotionPanel, QualityPanel, SessionHistory, SummaryView, VoicePanel, type DbState, type LocalSession } from "./components/Panels";
+import { MotionPanel } from "./components/Motion";
+import { Chip, MarkerList, QualityPanel, SessionHistory, SummaryView, VoicePanel, type DbState, type LocalSession } from "./components/Panels";
 import { useAudioService } from "./hooks/useAudioService";
 import { useVoice } from "./hooks/useVoice";
 import { api } from "./lib/api";
@@ -76,6 +77,18 @@ export default function App() {
 
   // ---- Feed frames into the active session ----
   useEffect(() => audio.subscribe((f) => recorderRef.current?.ingest(f)), [audio.subscribe]);
+  useEffect(() => audio.subscribeMotion((f) => recorderRef.current?.ingestMotion(f)), [audio.subscribeMotion]);
+
+  // Motion sensor connected / lost: announce on change (the 5 s de-duplication lives in useVoice).
+  const motionReceiving = audio.motion?.running && audio.motion?.receiving ? true : false;
+  const wasReceiving = useRef(motionReceiving);
+  useEffect(() => {
+    if (motionReceiving !== wasReceiving.current) {
+      if (motionReceiving) voiceRef.current.announce(VOICE.motionConnected);
+      else if (audio.motion?.running) voiceRef.current.announce(VOICE.motionDisconnected);
+      wasReceiving.current = motionReceiving;
+    }
+  }, [motionReceiving, audio.motion?.running]);
   useEffect(() => {
     if (!recording) return;
     const id = setInterval(() => setTick((t) => t + 1), 200);
@@ -96,6 +109,7 @@ export default function App() {
       if (!status?.running) return;
     }
     const rec = new SessionRecorder(Date.now(), status.source);
+    rec.onMovementStart.push(() => voiceRef.current.announce(VOICE.movementInterference));
     rec.onQualityChange.push((label, prev) => {
       if (label === "ok") { if (prev === null || prev === "no_signal") voiceRef.current.announce(VOICE.signalDetected); }
       else voiceRef.current.announce(QUALITY_VOICE[label]);
@@ -127,7 +141,7 @@ export default function App() {
     setTick((t) => t + 1);
     setLastSummary(summary);
     const label = `Session ${new Date(summary.started_at).toLocaleTimeString()} · ${summary.audio_source}`;
-    const payload = buildSessionPayload(label, summary, rec.markers, false);
+    const payload = buildSessionPayload(label, summary, rec.markers, rec.motionConnected);
     const entry: LocalSession = { id: summary.started_at, label: payload.label, summary, payload, save: "unsaved" };
     setLocalSessions((s) => [entry, ...s]);
     voiceRef.current.announce(VOICE.recordingStopped);
@@ -183,7 +197,8 @@ export default function App() {
         </div>
         <div className="chips" aria-label="System status">
           <Chip tone={audio.connection === "open" ? "good" : "critical"}>Audio service{audio.connection === "open" ? "" : " offline"}</Chip>
-          <Chip tone="neutral" title="Firmware and receiver arrive in Phase 3">Motion: not connected</Chip>
+          <Chip tone={motionReceiving ? "good" : audio.motion?.running ? "warning" : "neutral"}>
+            {motionReceiving ? "Motion: live" : audio.motion?.running ? "Motion: no data" : "Motion: not connected"}</Chip>
           {apiDown ? integ(false, "Neon", "")
             : <Chip tone={db === "ok" ? "good" : db === "unreachable" ? "critical" : "neutral"}
                 title={db === "not_configured" ? "Set DATABASE_URL in .env" : db === "unreachable" ? "DATABASE_URL is set but Neon did not respond" : "Connected"}>
@@ -248,12 +263,14 @@ export default function App() {
         </section>
         <div className="stack">
           <QualityPanel frame={audio.latest} stable={recorder?.stableQuality ?? null} />
-          <MotionPanel />
+          <MotionPanel status={audio.motion} latest={audio.motionLatest} ports={audio.motionPorts} error={audio.motionError}
+            subscribe={audio.subscribeMotion} onStart={(s) => void audio.startMotion(s)} onStop={() => void audio.stopMotion()}
+            onRefreshPorts={() => void audio.refreshMotionPorts()} serviceOnline={audio.connection === "open"} />
         </div>
       </div>
 
       <section className="card">
-        <Timeline recorder={recorder} tick={tick} motionConnected={false} />
+        <Timeline recorder={recorder} tick={tick} motionConnected={motionReceiving} />
         {lastSummary && !recording && (
           <div className="last-summary"><h3 className="sub">Last session summary</h3><SummaryView s={lastSummary} /></div>
         )}

@@ -64,30 +64,9 @@ export function QualityPanel({ frame, stable }: { frame: AudioFrame | null; stab
   );
 }
 
-// ---------- Motion (honest empty state until Phase 3) ----------
-export function MotionPanel() {
-  const axes = (unit: string, prefix: string) => (
-    <div className="motion-axes">
-      {(["X", "Y", "Z"] as const).map((a, i) => (
-        <div key={a} className="metric"><span><i className="sw line" style={{ background: `var(--series-${i + 1})` }} />{prefix} {a}</span>
-          <strong className="tabular muted">— {unit}</strong></div>
-      ))}
-    </div>
-  );
-  return (
-    <Card title="Movement · MPU-6050" aside={<Chip tone="neutral">Not connected</Chip>}>
-      <p className="muted small">No motion sensor is connected, so no readings are shown. Live acceleration and gyroscope
-        data will appear here once the Arduino UNO Q firmware and receiver are running (Phase 3).</p>
-      <h3 className="sub">Acceleration</h3>
-      {axes("g", "Accel")}
-      <h3 className="sub">Gyroscope</h3>
-      {axes("°/s", "Gyro")}
-    </Card>
-  );
-}
-
 // ---------- Event markers ----------
-const KIND_TEXT: Record<EventMarker["kind"], string> = { manual: "Manual", audio_activity: "Activity", quality: "Quality" };
+const KIND_TEXT: Record<EventMarker["kind"], string> = { manual: "Manual", audio_activity: "Activity", quality: "Quality",
+  movement_interference: "Movement" };
 
 export function MarkerList({ markers, canAdd, onAdd }: { markers: EventMarker[]; canAdd: boolean; onAdd: () => void }) {
   const list = [...markers].reverse();
@@ -95,7 +74,7 @@ export function MarkerList({ markers, canAdd, onAdd }: { markers: EventMarker[];
     <Card title="Event markers" aside={<button className="btn btn-sm" disabled={!canAdd} onClick={onAdd}
       title="Keyboard shortcut: M">+ Mark event <kbd>M</kbd></button>}>
       <p className="muted small">Experimental signal events. Activity markers mean "audio energy above the noise
-        floor", not a swallow or any clinical finding.</p>
+        floor"; movement markers mean the sensor mount moved. Neither is a swallow or any clinical finding.</p>
       {list.length === 0 ? <p className="empty">No markers yet.</p> : (
         <ol className="markers">
           {list.slice(0, 50).map((m) => (

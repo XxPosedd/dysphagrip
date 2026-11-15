@@ -52,3 +52,17 @@ describe("DysphaGrip API (no integrations configured)", () => {
     expect(missing.status).toBe(404);
   });
 });
+
+describe("production serving", () => {
+  it("answers /audio with a JSON 503 instead of the SPA page", async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const res = await request(createApp({ store: null })).get("/audio/devices");
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/presenter's laptop/);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+});

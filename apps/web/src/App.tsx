@@ -224,6 +224,11 @@ export default function App() {
         </div>
       </header>
 
+      {health?.read_only && (
+        <p className="notice-banner" role="note"><strong>Public read-only demo.</strong> Live audio and motion capture run on the
+          presenter's laptop next to the sensors, so they show as offline here. Browse saved sessions, resources and the signal lab;
+          saving and deleting are disabled.</p>
+      )}
       <p className="disclaimer"><strong>Research prototype, not a medical device.</strong> DysphaGrip shows experimental
         signal features only. It does not diagnose dysphagia, does not detect aspiration or residue, and cannot confirm that
         swallowing is safe.</p>

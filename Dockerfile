@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY apps/web/package*.json ./apps/web/
 COPY server/package*.json ./server/
@@ -7,7 +7,7 @@ COPY apps/web ./apps/web
 COPY server ./server
 RUN npm run build --prefix apps/web && npm run build --prefix server && npm prune --omit=dev --prefix server
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/server/package.json ./server/package.json

@@ -15,6 +15,8 @@ export interface AppDeps {
   tts?: TextToSpeech;
   /** Max uncached ElevenLabs calls per minute (cached phrases are free). */
   ttsPerMinute?: number;
+  /** Public demo: block every write (session save/delete). Defaults to DEMO_READ_ONLY=true in the env. */
+  readOnly?: boolean;
   /** Public resources (read-only for the API). `undefined` -> from DATABASE_URL. */
   resources?: ResourceStore | null;
 }
@@ -26,12 +28,22 @@ export function redact(message: string): string {
 
 export function createApp(deps: AppDeps = {}) {
   const store = deps.store === undefined ? storeFromEnv() : deps.store;
+  const readOnly = deps.readOnly ?? process.env.DEMO_READ_ONLY?.trim().toLowerCase() === "true";
   const tts = deps.tts ?? ttsFromEnv();
   const ttsLimiter = new RateLimiter(deps.ttsPerMinute ?? 30, 60_000);
   const resourceStore = deps.resources === undefined ? resourceStoreFromEnv() : deps.resources;
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: "2mb" }));
+
+  // Read-only public demo: nobody visiting the hosted site can write to or delete from the database.
+  // (Voice stays available: it only ever speaks the fixed phrase list and each phrase is cached after one call.)
+  if (readOnly) {
+    app.use("/api/sessions", (req, res, next) => {
+      if (req.method === "GET") return next();
+      res.status(403).json({ error: "This is a read-only public demo. Sessions are recorded and saved on the presenter's laptop." });
+    });
+  }
 
   const notConfigured = (res: Response) =>
     res.status(503).json({ error: "Neon is not configured", detail: "Set DATABASE_URL in .env and run npm run db:migrate --prefix server" });
@@ -46,6 +58,7 @@ export function createApp(deps: AppDeps = {}) {
     res.json({
       ok: true,
       service: "dysphagrip-api",
+      read_only: readOnly,
       integrations: {
         database: store !== null,
         elevenlabs: tts.configured,
@@ -186,6 +199,11 @@ export function createApp(deps: AppDeps = {}) {
   if (process.env.NODE_ENV === "production") {
     const here = path.dirname(fileURLToPath(import.meta.url));
     const webDist = path.resolve(here, "../../apps/web/dist");
+    // The audio/motion service runs locally next to the sensors and is never deployed. Without this, the SPA
+    // catch-all below would answer /audio/* with index.html and the dashboard would try to parse HTML as data.
+    app.use("/audio", (_req, res) => {
+      res.status(503).json({ error: "The audio and motion service runs on the presenter's laptop, not in this deployment." });
+    });
     app.use(express.static(webDist));
     app.get("*", (_req, res) => res.sendFile(path.join(webDist, "index.html")));
   }

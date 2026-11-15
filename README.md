@@ -38,6 +38,9 @@ El monitor web trabaja con características de audio y movimiento. Los WAV por m
 | ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Live: voice "Matilda", spoken cues verified in the dashboard |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
+| Vultr (MLH) | Hosted read-only demo of the dashboard + API (Docker) | 🔜 Code ready (`DEMO_READ_ONLY`, Dockerfile); deploy per [docs/DEPLOY.md](docs/DEPLOY.md) |
+| GoDaddy Registry (MLH) | Domain for the hosted demo (code MLHSH77) | 🔜 Register, then point DNS at Vultr per [docs/DEPLOY.md](docs/DEPLOY.md) |
+
 An integration is only claimed once it is implemented, tested and visible in the demo.
 
 ## Architecture
@@ -243,6 +246,9 @@ Then follow *Run locally* above. `.env`, `.neon`, `node_modules/`, `.venv/` and 
 so create `.env` on each machine (copy `.env.example`, or run `neon init` to pull the Neon variables).
 
 ## Deploy
+
+**Hosted demo:** follow [docs/DEPLOY.md](docs/DEPLOY.md) (Vultr + GoDaddy, Docker, HTTPS, read-only mode).
+
 
 `render.yaml` and the `Dockerfile` build the web app and serve it from Express. The Python audio
 service runs **locally** on the MacBook next to the hardware; it is not deployed. Deployment is

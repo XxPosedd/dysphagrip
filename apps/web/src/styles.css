@@ -258,3 +258,6 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: va
 .anomaly-within { border-left: 4px solid var(--status-good); }
 .anomaly-blocked { border-left: 4px solid var(--text-muted); }
 .anomaly-result a { color: var(--accent); }
+
+.notice-banner { font-size: 13px; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent); border-radius: 8px; padding: 9px 12px; }

@@ -105,3 +105,30 @@ describe("redact", () => {
     expect(redact("bad postgres://a:b@h/db?sslmode=require here")).toBe("bad postgres://[redacted] here");
   });
 });
+
+describe("read-only public demo mode", () => {
+  it("blocks session writes and deletes but still serves reads", async () => {
+    const store = new MemoryStore();
+    const seeded = await store.create(parseSessionInput(validPayload()));
+    const app = createApp({ store, readOnly: true });
+    expect((await request(app).get("/api/health")).body.read_only).toBe(true);
+    const post = await request(app).post("/api/sessions").send(validPayload());
+    expect(post.status).toBe(403);
+    expect(post.body.error).toMatch(/read-only/);
+    expect((await request(app).delete(`/api/sessions/${seeded.id}`)).status).toBe(403);
+    expect(store.sessions.size).toBe(1);
+    expect((await request(app).get("/api/sessions")).body.sessions).toHaveLength(1);
+    expect((await request(app).get(`/api/sessions/${seeded.id}`)).status).toBe(200);
+  });
+
+  it("is off unless DEMO_READ_ONLY=true", async () => {
+    delete process.env.DEMO_READ_ONLY;
+    expect((await request(createApp({ store: new MemoryStore() })).get("/api/health")).body.read_only).toBe(false);
+    process.env.DEMO_READ_ONLY = "true";
+    try {
+      expect((await request(createApp({ store: new MemoryStore() })).post("/api/sessions").send(validPayload())).status).toBe(403);
+    } finally {
+      delete process.env.DEMO_READ_ONLY;
+    }
+  });
+});

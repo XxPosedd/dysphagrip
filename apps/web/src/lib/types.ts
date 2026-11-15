@@ -209,5 +209,6 @@ export interface PublicResource {
 
 export interface ApiHealth {
   ok: boolean;
+  read_only?: boolean;
   integrations: { database: boolean; elevenlabs: boolean; brightdata: boolean };
 }

@@ -48,7 +48,7 @@ const DEFAULT_FORMAT = "mp3_44100_128";          // available on every plan tier
 const DISK_PHRASES = ["Recording started.", "Recording stopped."];
 const VOICE_SETTINGS = { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true };
 const MAX_STATUS_AUDIO_BYTES = 2 * 1024 * 1024;
-function looksLikeMp3(audio: Uint8Array) {
+export function looksLikeMp3(audio: Uint8Array) {
   return audio.length >= 100 && audio.length <= MAX_STATUS_AUDIO_BYTES &&
     ((audio[0] === 0x49 && audio[1] === 0x44 && audio[2] === 0x33) ||
      (audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0));

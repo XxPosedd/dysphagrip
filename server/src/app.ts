@@ -2,6 +2,7 @@ import express, { type Response } from "express";
 import cors from "cors";
 import path from "node:path";
 import { homedir } from "node:os";
+import { mountPublicApi } from "./publicApi.js";
 import { mountLocalMonitor } from "./localMonitorProxy.js";
 import { fileURLToPath } from "node:url";
 import { storeFromEnv, type SessionStore } from "./db.js";
@@ -34,20 +35,17 @@ export function redact(message: string): string {
 }
 
 export function createApp(deps: AppDeps = {}) {
-  const store = deps.store === undefined ? storeFromEnv() : deps.store;
-  const tts = deps.tts ?? ttsFromEnv();
-  const ttsLimiter = new RateLimiter(deps.ttsPerMinute ?? 30, 60_000);
-  const resourceStore = deps.resources === undefined ? resourceStoreFromEnv() : deps.resources;
+  const publicMode = process.env.DYSPHAGRIP_PUBLIC === "1";
+  const localMode = !publicMode && process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1";
   const readResearch = createResearchReader(deps.researchBrightData === undefined
     ? brightDataFromEnv({ allowedHosts: new Set(["api.crossref.org"]), timeoutMs: 6000 })
     : deps.researchBrightData);
-  const conditionCache = deps.conditionBrightData === undefined && process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1"
+  const conditionCache = deps.conditionBrightData === undefined && localMode
     ? path.join(homedir(), "Library", "Application Support", "DysphaGrip", "condition-source.json") : undefined;
   const readCondition = createConditionReader(deps.conditionBrightData === undefined
     ? brightDataFromEnv({ allowedHosts: new Set(["www.parkinson.org"]), timeoutMs: 12000 })
     : deps.conditionBrightData, Date.now, conditionCache);
   const app = express();
-  const localMode = process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1";
   if (localMode) {
     app.use((req, res, next) => {
       const local = (host: string) => ["127.0.0.1", "localhost", "[::1]"].includes(host);
@@ -59,9 +57,41 @@ export function createApp(deps: AppDeps = {}) {
       } catch { res.sendStatus(403); return; }
       next();
     });
-  } else { app.use(cors()); }
-  app.use(express.json({ limit: "2mb" }));
-  if (process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1") {
+  } else if (!publicMode) { app.use(cors()); }
+  app.use(express.json({ limit: publicMode ? "2kb" : "2mb" }));
+  app.get("/api/condition", async (_req, res) => { res.json(await readCondition()); });
+  app.get("/api/research", async (_req, res) => { res.json(await readResearch()); });
+
+  if (publicMode) mountPublicApi(app);
+  else mountRecordingApi(app, deps, localMode);
+
+  app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
+
+  // Malformed JSON bodies and other unexpected errors -> JSON, never an HTML stack trace.
+  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = (error as { status?: number }).status;
+    if (status === 400) return void res.status(400).json({ error: "Malformed JSON body" });
+    if (status === 413) return void res.status(413).json({ error: "Payload too large" });
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  });
+
+  if (process.env.NODE_ENV === "production") {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const webDist = path.resolve(here, "../../apps/web/dist");
+    app.use(express.static(webDist));
+    app.get("*", (_req, res) => res.sendFile(path.join(webDist, "index.html")));
+  }
+
+  return app;
+}
+
+function mountRecordingApi(app: express.Express, deps: AppDeps, localMode: boolean) {
+  const store = deps.store === undefined ? storeFromEnv() : deps.store;
+  const tts = deps.tts ?? ttsFromEnv();
+  const ttsLimiter = new RateLimiter(deps.ttsPerMinute ?? 30, 60_000);
+  const resourceStore = deps.resources === undefined ? resourceStoreFromEnv() : deps.resources;
+  if (localMode) {
     const historyStore = deps.monitorHistoryStore === undefined
       ? (process.env.DATABASE_URL ? new NeonMonitorHistory(process.env.DATABASE_URL) : null)
       : deps.monitorHistoryStore;
@@ -205,8 +235,6 @@ export function createApp(deps: AppDeps = {}) {
     }
   });
 
-  app.get("/api/condition", async (_req, res) => { res.json(await readCondition()); });
-  app.get("/api/research", async (_req, res) => { res.json(await readResearch()); });
 
   // Attributed public-interest resources, collected offline by `npm run resources:refresh` (never on request).
   app.get("/api/resources", async (_req, res) => {
@@ -224,24 +252,4 @@ export function createApp(deps: AppDeps = {}) {
       dbFailure(res, error);
     }
   });
-
-  app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
-
-  // Malformed JSON bodies and other unexpected errors -> JSON, never an HTML stack trace.
-  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    const status = (error as { status?: number }).status;
-    if (status === 400) return void res.status(400).json({ error: "Malformed JSON body" });
-    if (status === 413) return void res.status(413).json({ error: "Payload too large" });
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
-  });
-
-  if (process.env.NODE_ENV === "production") {
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    const webDist = path.resolve(here, "../../apps/web/dist");
-    app.use(express.static(webDist));
-    app.get("*", (_req, res) => res.sendFile(path.join(webDist, "index.html")));
-  }
-
-  return app;
 }

@@ -78,6 +78,6 @@ export const api = {
       throw new ApiError((body as { error?: string }).error || `HTTP ${res.status}`, res.status);
     }
   },
-  voice: () => request<{ configured: boolean; model_id: string | null; voice: { id: string; name: string | null } | null }>(`${API_BASE}/api/voice`),
+  voice: () => request<{ configured: boolean; fallback_provider?: string | null; model_id: string | null; voice: { id: string; name: string | null } | null }>(`${API_BASE}/api/voice`),
   speak: async (message: string) => (await statusClip(message)).blob,
 };

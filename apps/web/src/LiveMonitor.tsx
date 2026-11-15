@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, Chip } from "./components/Panels";
 import MonitorSignals from "./components/MonitorSignals";
+import MonitorHeader from "./components/MonitorHeader";
 import { MonitorHistoryPanel, ResearchPanel } from "./components/MonitorRecords";
 import { useRecordingVoice } from "./hooks/useRecordingVoice";
 import { formatDuration } from "./lib/format";
@@ -110,12 +111,7 @@ export default function LiveMonitor() {
     live.state === "error" ? "Hardware error" : activityName(live.state);
   const activity = canMark ? live?.activity : null;
   return <main className="app field-monitor">
-    <header className="topbar">
-      <div className="brand"><div className="logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M2 12h4l2-6 4 12 3-9 2 3h5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </div><div><h1>DysphaGrip</h1><p className="muted small">Experimental swallowing-signal monitor</p></div></div>
-      <nav aria-label="Dashboard sections"><a href="#signals">Signals</a><a href="#history">Sessions</a><a href="#research">Research</a></nav>
-    </header>
+    <MonitorHeader><a href="#signals">Signals</a><a href="#history">Sessions</a><a href="#research">Research</a></MonitorHeader>
 
     <section id="signals" className="card monitor-toolbar" aria-label="Recording controls">
       <div><h2>Live monitor</h2>

@@ -1,0 +1,40 @@
+services:
+  app:
+    image: dysphagrip-public:${RELEASE_COMMIT:-latest}
+    build:
+      context: ..
+      args:
+        VITE_DYSPHAGRIP_PUBLIC: "1"
+    environment:
+      DYSPHAGRIP_PUBLIC: "1"
+    labels:
+      org.dysphagrip.voice-revision: ${VOICE_REVISION:-bundled}
+    env_file:
+      - ${SETTINGS_DIR:?Missing settings directory}/brightdata.env
+    volumes:
+      - ${SETTINGS_DIR}/voice:/app/status-voice:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok||!(await r.json()).public_dashboard)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      start_period: 3s
+      timeout: 4s
+      retries: 5
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:

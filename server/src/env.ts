@@ -5,10 +5,12 @@ import dotenv from "dotenv";
 // `npm run dev --prefix server` sets cwd to server/, so the default
 // `dotenv/config` would miss the repository-root .env. Load it explicitly.
 const here = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(here, "../../.env") });
-dotenv.config(); // also allow server/.env, without overriding values already set
+if (process.env.DYSPHAGRIP_PUBLIC !== "1") {
+  dotenv.config({ path: path.resolve(here, "../../.env") });
+  dotenv.config(); // also allow server/.env, without overriding values already set
+}
 
-if (process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1") {
+if (process.env.DYSPHAGRIP_PUBLIC !== "1" && process.env.DYSPHAGRIP_LOCAL_DASHBOARD === "1") {
   const { homedir } = await import("node:os");
   const settings = path.join(homedir(), "Library", "Application Support", "DysphaGrip");
   dotenv.config({ path: path.join(settings, "providers.env") });

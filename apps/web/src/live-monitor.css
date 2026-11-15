@@ -11,6 +11,12 @@
 .monitor-controls label { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
 .monitor-controls input { accent-color: var(--accent); }
 .monitor-controls button { min-width: 82px; }
+.public-overview p { max-width: 68ch; }
+.public-overview a { text-decoration: none; }
+.public-voice { margin-top: 12px; }
+.public-recording { margin: 0; }
+.public-recording img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.public-recording figcaption { margin-top: 10px; font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: normal; }
 .monitor-traces { display: grid; gap: 15px; }
 .monitor-plot { margin: 0; }
 .monitor-plot figcaption, .trace-time, .sensor-list > div, .monitor-count { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

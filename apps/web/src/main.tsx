@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import LiveMonitor from "./LiveMonitor";
+const PublicDashboard = React.lazy(() => import("./PublicDashboard"));
 const Laboratorio = React.lazy(() => import("./Laboratorio"));
 import "./styles.css";
 
@@ -30,12 +31,13 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 }
 
 const view = new URLSearchParams(window.location.search).get("vista");
+const publicBuild = import.meta.env.VITE_DYSPHAGRIP_PUBLIC === "1";
 const workstation = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-const instruments = view === "instrumentos" || (!workstation && view === "monitor");
-const oldLab = view === "laboratorio" || (!instruments && !workstation) ||
+const instruments = !publicBuild && (view === "instrumentos" || (!workstation && view === "monitor"));
+const oldLab = view === "laboratorio" || (!publicBuild && !instruments && !workstation) ||
   (!view && ["#practica", "#sesiones"].includes(location.hash));
 document.documentElement.lang = oldLab ? "es" : "en";
-document.title = oldLab ? "Proyecto 2 · DysphaGrip" : "DysphaGrip · Live monitor";
+document.title = oldLab ? "Proyecto 2 · DysphaGrip" : publicBuild ? "DysphaGrip · Research dashboard" : "DysphaGrip · Live monitor";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -44,7 +46,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         {oldLab ? <Laboratorio /> : instruments ? <>
           <nav className="monitor-return"><a href={workstation ? "?vista=laboratorio" : "?"}>← Laboratorio de Proyecto 2</a></nav>
           <Monitor />
-        </> : <LiveMonitor />}
+        </> : publicBuild ? <PublicDashboard /> : <LiveMonitor />}
       </React.Suspense>
     </ErrorBoundary>
   </React.StrictMode>,

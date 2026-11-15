@@ -32,9 +32,24 @@ if [ -d "${APP_DIR}/.git" ]; then git -C "${APP_DIR}" pull --ff-only; else git c
 echo "== 4/6 settings"
 if [ ! -s "${ENV_FILE}" ]; then
   echo "Paste values from your local .env. Input is hidden; nothing is printed or sent anywhere except this file."
-  read -rsp "  DATABASE_URL (Neon, pooled): " DB </dev/tty; echo
-  read -rsp "  ELEVENLABS_API_KEY: " ELK </dev/tty; echo
-  read -rp  "  ELEVENLABS_VOICE_ID: " ELV </dev/tty
+  echo "Paste with RIGHT-CLICK (do not press Ctrl+Z). Surrounding quotes are removed automatically."
+  # Strip whitespace and one pair of surrounding quotes ("..." or '...'), as found in .env files.
+  clean() { local v="$1"; v="${v#"${v%%[![:space:]]*}"}"; v="${v%"${v##*[![:space:]]}"}"; v="${v#[\"\']}"; v="${v%[\"\']}"; printf '%s' "$v"; }
+  while :; do
+    read -rsp "  DATABASE_URL (Neon, pooled): " DB </dev/tty; echo; DB="$(clean "$DB")"
+    if [[ "$DB" =~ ^postgres(ql)?://[^[:space:]\"\']+$ ]]; then break; fi
+    echo "  That doesn't look like a single postgres:// URL (no spaces or quotes). Please paste just the URL again."
+  done
+  while :; do
+    read -rsp "  ELEVENLABS_API_KEY: " ELK </dev/tty; echo; ELK="$(clean "$ELK")"
+    if [[ -n "$ELK" && ! "$ELK" =~ [[:space:]] ]]; then break; fi
+    echo "  Empty or contains spaces. Please paste just the key again."
+  done
+  while :; do
+    read -rp "  ELEVENLABS_VOICE_ID: " ELV </dev/tty; ELV="$(clean "$ELV")"
+    if [[ "$ELV" =~ ^[A-Za-z0-9]+$ ]]; then break; fi
+    echo "  A voice ID is letters and digits only. Please paste it again."
+  done
   ( umask 077; printf 'NODE_ENV=production\nPORT=3000\nDEMO_READ_ONLY=true\nDATABASE_URL=%s\nELEVENLABS_API_KEY=%s\nELEVENLABS_VOICE_ID=%s\n' \
       "${DB}" "${ELK}" "${ELV}" > "${ENV_FILE}" )
   unset DB ELK ELV

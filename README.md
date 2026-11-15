@@ -39,7 +39,7 @@ El monitor web trabaja con características de audio y movimiento. Los WAV por m
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
 | Vultr (MLH) | Hosted read-only demo of the dashboard + API (Docker) | 🔜 Code ready (`DEMO_READ_ONLY`, Dockerfile); deploy per [docs/DEPLOY.md](docs/DEPLOY.md) |
-| GoDaddy Registry (MLH) | Domain for the hosted demo (code MLHSH77) | 🔜 Register, then point DNS at Vultr per [docs/DEPLOY.md](docs/DEPLOY.md) |
+| GoDaddy Registry (MLH) | Domain for the hosted demo (code MLHSH77) | ⏭ Skipped: the available domain ending does not allow WHOIS privacy. The hosted demo uses an sslip.io HTTPS address instead |
 
 An integration is only claimed once it is implemented, tested and visible in the demo.
 

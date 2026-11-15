@@ -12,6 +12,21 @@ Time needed: about 30 minutes, most of it waiting for DNS and HTTPS.
 
 ---
 
+## No domain? (privacy option, recommended if WHOIS privacy isn't available)
+Some domain endings (e.g. `.us`) **do not allow WHOIS privacy**, so your name, address and phone number become public.
+You can skip the domain entirely:
+- Skip steps 1 and 4.
+- In step 5, use the free **sslip.io** name for your server's IP instead of a domain: for IP `203.0.113.5` the name is
+  `203-0-113-5.sslip.io`, which already points at that IP. Caddy gets a real HTTPS certificate for it automatically:
+  ```
+  203-0-113-5.sslip.io {
+      reverse_proxy 127.0.0.1:3000
+  }
+  ```
+- Your site is then `https://203-0-113-5.sslip.io` (use your server's IP with dashes). No registration, no personal data.
+- Simplest of all: `http://SERVER_IP` works without Caddy if you publish port 80 instead
+  (`-p 80:3000` in the docker run command), but without HTTPS.
+
 ## 1. Domain (GoDaddy Registry, code **MLHSH77**)
 1. Register the domain using the MLH code **MLHSH77** (follow the MLH instructions for where to redeem it),
    e.g. `dysphagrip.<ending>`.

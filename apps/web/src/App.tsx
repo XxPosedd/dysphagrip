@@ -6,14 +6,15 @@ import { Chip, MarkerList, MotionPanel, QualityPanel, SessionHistory, SummaryVie
 import { useAudioService } from "./hooks/useAudioService";
 import { useVoice } from "./hooks/useVoice";
 import { api } from "./lib/api";
+import { VOICE, type VoiceText } from "./lib/voicePhrases";
 import { formatDuration } from "./lib/format";
 import { SessionRecorder, buildSessionPayload, describeSource } from "./lib/session";
 import type { ApiHealth, QualityLabel, SessionSummary, StoredSession } from "./lib/types";
 
-const QUALITY_VOICE: Record<Exclude<QualityLabel, "ok">, string> = {
-  no_signal: "No audio signal. Check the sensor connection.",
-  clipping: "Audio input is clipping. Reduce the gain.",
-  mains_hum: "Electrical hum detected. Check the cable and grounding.",
+const QUALITY_VOICE: Record<Exclude<QualityLabel, "ok">, VoiceText> = {
+  no_signal: VOICE.noSignal,
+  clipping: VOICE.clipping,
+  mains_hum: VOICE.mainsHum,
 };
 
 export default function App() {
@@ -83,7 +84,7 @@ export default function App() {
   // Audio input dropped mid-session: announce it (the session keeps running; the timeline shows the gap).
   const wasRunning = useRef(running);
   useEffect(() => {
-    if (wasRunning.current && !running && recorderRef.current?.running) voiceRef.current.announce("Audio input stopped.");
+    if (wasRunning.current && !running && recorderRef.current?.running) voiceRef.current.announce(VOICE.inputStopped);
     wasRunning.current = running;
   }, [running]);
 
@@ -95,13 +96,13 @@ export default function App() {
     }
     const rec = new SessionRecorder(Date.now(), status.source);
     rec.onQualityChange.push((label, prev) => {
-      if (label === "ok") { if (prev === null || prev === "no_signal") voiceRef.current.announce("Audio signal detected."); }
+      if (label === "ok") { if (prev === null || prev === "no_signal") voiceRef.current.announce(VOICE.signalDetected); }
       else voiceRef.current.announce(QUALITY_VOICE[label]);
     });
     recorderRef.current = rec;
     setRecorder(rec);
     setLastSummary(null);
-    voice.announce("Recording started.");
+    voice.announce(VOICE.recordingStarted);
   };
 
   const saveLocal = useCallback(async (entry: LocalSession) => {
@@ -109,12 +110,12 @@ export default function App() {
     try {
       await api.saveSession(entry.payload);
       setLocalSessions((all) => all.map((x) => (x.id === entry.id ? { ...x, save: "saved" } : x)));
-      voiceRef.current.announce("Session saved successfully.");
+      voiceRef.current.announce(VOICE.sessionSaved);
       void loadSessions();
     } catch (e) {
       const message = (e as Error).message;
       setLocalSessions((all) => all.map((x) => (x.id === entry.id ? { ...x, save: "failed", error: `Not saved: ${message}` } : x)));
-      voiceRef.current.announce("Session could not be saved.");
+      voiceRef.current.announce(VOICE.sessionNotSaved);
     }
   }, [loadSessions]);
 
@@ -128,7 +129,7 @@ export default function App() {
     const payload = buildSessionPayload(label, summary, rec.markers, false);
     const entry: LocalSession = { id: summary.started_at, label: payload.label, summary, payload, save: "unsaved" };
     setLocalSessions((s) => [entry, ...s]);
-    voiceRef.current.announce("Recording stopped.");
+    voiceRef.current.announce(VOICE.recordingStopped);
     if (db === "ok") await saveLocal(entry);
   };
 
@@ -186,7 +187,7 @@ export default function App() {
             : <Chip tone={db === "ok" ? "good" : db === "unreachable" ? "critical" : "neutral"}
                 title={db === "not_configured" ? "Set DATABASE_URL in .env" : db === "unreachable" ? "DATABASE_URL is set but Neon did not respond" : "Connected"}>
                 {db === "unreachable" ? "Neon unreachable" : "Neon"}</Chip>}
-          {integ(health?.integrations.elevenlabs, "ElevenLabs", "Phase 7")}
+          {integ(health?.integrations.elevenlabs, "ElevenLabs", "set ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID")}
           {integ(health?.integrations.brightdata, "Bright Data", "Phase 8")}
         </div>
       </header>
@@ -259,7 +260,8 @@ export default function App() {
 
       <div className="grid-two">
         <MarkerList markers={recorder?.markers ?? []} canAdd={recording} onAdd={addMarker} />
-        <VoicePanel enabled={voice.enabled} setEnabled={voice.setEnabled} state={voice.state} log={voice.log} />
+        <VoicePanel enabled={voice.enabled} setEnabled={voice.setEnabled} state={voice.state} log={voice.log}
+          info={voice.info} lastError={voice.lastError} onTest={() => voice.announce(VOICE.voiceReady, { force: true })} />
       </div>
 
       <SessionHistory local={localSessions} remote={remoteSessions} remoteError={remoteError} db={db}

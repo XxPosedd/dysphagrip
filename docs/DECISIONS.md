@@ -64,3 +64,20 @@
   runtime uses only `DATABASE_URL` (pooled; the serverless HTTP driver). `neon.ts`, `@neon/config` and `@neon/env`
   were added by `neon init` for Neon's own branch/config tooling; the app code does not import them.
   `.neon` (project link) is git-ignored.
+
+## Phase 7 (ElevenLabs)
+
+- **Allowlisted phrases only.** `POST /api/voice/status` speaks one of a fixed set of operational phrases
+  (`server/src/voice/phrases.ts`) and rejects any other text. This protects the ElevenLabs quota on a public demo and
+  guarantees no clinical wording; a test fails the build if a phrase mentions aspiration, diagnosis, safety of swallowing, etc.
+  A contract test keeps the dashboard's phrase list identical to the server's.
+- **Server-side cache + in-flight de-duplication**: each phrase is generated once per server process and replayed
+  (`X-Voice-Cache: hit|miss`). Repeated cues cost nothing and play instantly.
+- **Rate limit on uncached calls** (30/min) and a 15 s timeout; ElevenLabs errors (401 bad key, 404 voice, 429 quota,
+  timeouts) are mapped to clear messages that never include the key.
+- **Model**: `eleven_multilingual_v2` (ElevenLabs' documented default), overridable with `ELEVENLABS_MODEL_ID`;
+  output `mp3_44100_128` (available on every plan).
+- **No silent fallback** to browser speech synthesis: when ElevenLabs is not configured or fails, announcements are shown as
+  text and labelled 💬, so the demo never implies ElevenLabs is speaking when it isn't.
+- **Autoplay**: the first cue ("Recording started.") follows the Start-session click, a user gesture, so browsers allow playback.
+  If playback is blocked anyway, the panel says so.

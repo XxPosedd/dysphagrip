@@ -3,12 +3,17 @@ import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { storeFromEnv, type SessionStore } from "./db.js";
-import { speakStatus } from "./integrations/elevenlabs.js";
+import { RateLimiter, TtsError, ttsFromEnv, type TextToSpeech } from "./integrations/elevenlabs.js";
+import { VOICE_PHRASES, isAllowedPhrase } from "./voice/phrases.js";
 import { isUuid, parseSessionInput, ValidationError } from "./validation.js";
 
 export interface AppDeps {
   /** Session persistence. `undefined` -> build from DATABASE_URL; `null` -> explicitly not configured. */
   store?: SessionStore | null;
+  /** Text-to-speech. `undefined` -> build from ELEVENLABS_* env vars. */
+  tts?: TextToSpeech;
+  /** Max uncached ElevenLabs calls per minute (cached phrases are free). */
+  ttsPerMinute?: number;
 }
 
 /** Never echo connection strings back to clients or logs. */
@@ -18,6 +23,8 @@ export function redact(message: string): string {
 
 export function createApp(deps: AppDeps = {}) {
   const store = deps.store === undefined ? storeFromEnv() : deps.store;
+  const tts = deps.tts ?? ttsFromEnv();
+  const ttsLimiter = new RateLimiter(deps.ttsPerMinute ?? 30, 60_000);
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: "2mb" }));
@@ -37,7 +44,7 @@ export function createApp(deps: AppDeps = {}) {
       service: "dysphagrip-api",
       integrations: {
         database: store !== null,
-        elevenlabs: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID),
+        elevenlabs: tts.configured,
         brightdata: Boolean(process.env.BRIGHTDATA_API_TOKEN && process.env.BRIGHTDATA_DATASET_ID),
       },
     });
@@ -105,16 +112,42 @@ export function createApp(deps: AppDeps = {}) {
     }
   });
 
+  // Voice configuration for the dashboard (never includes the API key).
+  app.get("/api/voice", async (_req, res) => {
+    res.json({
+      configured: tts.configured,
+      provider: "elevenlabs",
+      model_id: tts.modelId,
+      voice: tts.configured ? await tts.voiceInfo() : null,
+      phrases: VOICE_PHRASES,
+    });
+  });
+
+  // Speak one approved status phrase. Arbitrary text is rejected (cost + safety; see voice/phrases.ts).
   app.post("/api/voice/status", async (req, res) => {
-    const message = typeof req.body?.message === "string" ? req.body.message.slice(0, 300) : "";
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
     if (!message) return void res.status(400).json({ error: "message is required" });
+    if (!isAllowedPhrase(message)) {
+      return void res.status(400).json({ error: "Message is not an approved status phrase", allowed: VOICE_PHRASES });
+    }
+    if (!tts.configured) return void res.status(501).json({ error: "ElevenLabs is not configured" });
+    if (!tts.isCached(message) && !ttsLimiter.tryTake()) {
+      res.setHeader("Retry-After", "60");
+      return void res.status(429).json({ error: "Voice rate limit reached; try again shortly" });
+    }
     try {
-      const audio = await speakStatus(message);
-      if (!audio) return void res.status(501).json({ error: "ElevenLabs is not configured" });
+      const { audio, cached } = await tts.synthesize(message);
       res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.setHeader("X-Voice-Cache", cached ? "hit" : "miss");
       res.send(Buffer.from(audio));
     } catch (error) {
-      res.status(502).json({ error: "Voice service failed", detail: String(error) });
+      if (error instanceof TtsError) {
+        console.error("Voice error:", error.message);
+        return void res.status(error.status).json({ error: error.message, retryable: error.retryable });
+      }
+      console.error("Voice error:", error);
+      res.status(502).json({ error: "Voice service failed" });
     }
   });
 

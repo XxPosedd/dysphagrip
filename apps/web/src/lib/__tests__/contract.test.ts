@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { parseSessionInput } from "../../../../../server/src/validation";
 import { SessionRecorder, buildSessionPayload, storedToSummary } from "../session";
 import type { AudioFrame, StoredSession } from "../types";
+import { VOICE_PHRASES } from "../../../../../server/src/voice/phrases";
+import { VOICE } from "../voicePhrases";
 
 const T0 = 1_800_000_000_000;
 const frame = (t: number, activity: boolean): AudioFrame => ({
@@ -44,5 +46,15 @@ describe("dashboard → API session contract", () => {
     expect(s.duration_ms).toBe(10_000);
     expect(s.ended_at).toBe(stored.ended_at);
     expect(s.quality_ms.ok).toBe(10_000);
+  });
+});
+
+
+describe("dashboard voice phrases ↔ server allowlist", () => {
+  it("every dashboard phrase is approved by the server, and vice versa", () => {
+    const web = new Set<string>(Object.values(VOICE));
+    const server = new Set<string>(VOICE_PHRASES);
+    expect([...web].filter((p) => !server.has(p))).toEqual([]);
+    expect([...server].filter((p) => !web.has(p))).toEqual([]);
   });
 });

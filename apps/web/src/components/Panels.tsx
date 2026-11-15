@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { api } from "../lib/api";
-import type { Announcement, VoiceState } from "../hooks/useVoice";
+import type { Announcement, VoiceInfo, VoiceState } from "../hooks/useVoice";
 import { formatDuration, formatHz, formatSessionTime, pct } from "../lib/format";
 import { QUALITY_TEXT, storedToSummary } from "../lib/session";
 import type { AudioFrame, EventMarker, QualityLabel, SessionPayload, SessionSummary, StoredMarker, StoredSession } from "../lib/types";
@@ -229,22 +229,40 @@ export function SessionHistory({ local, remote, remoteError, db, onRefresh, onRe
 }
 
 // ---------- Voice feedback ----------
-export function VoicePanel({ enabled, setEnabled, state, log }: {
+export function VoicePanel({ enabled, setEnabled, state, log, info, lastError, onTest }: {
   enabled: boolean; setEnabled: (v: boolean) => void; state: VoiceState; log: Announcement[];
+  info: VoiceInfo | null; lastError: string | null; onTest: () => void;
 }) {
   const chip = state === "ready" ? <Chip tone="good">ElevenLabs</Chip>
     : state === "not_configured" ? <Chip tone="neutral">Not configured</Chip>
-    : state === "error" ? <Chip tone="critical">Voice error</Chip> : <Chip tone="neutral">Untested</Chip>;
+    : state === "api_offline" ? <Chip tone="neutral">API offline</Chip>
+    : state === "error" ? <Chip tone="critical">Voice error</Chip> : <Chip tone="neutral">Checking…</Chip>;
+  const voiceName = info?.voice ? (info.voice.name ?? `voice ${info.voice.id.slice(0, 6)}…`) : null;
   return (
     <Card title="Voice feedback" aside={chip}>
-      <label className="toggle"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        Speak status updates</label>
-      {state === "not_configured" && <p className="muted small">ElevenLabs is not configured on the server (Phase 7).
+      <div className="row voice-controls">
+        <label className="toggle"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          Speak status updates</label>
+        <span className="grow" />
+        <button className="btn btn-sm" disabled={state !== "ready" && state !== "error"} onClick={onTest}>▶ Test voice</button>
+      </div>
+      {info?.configured && <p className="muted small">ElevenLabs{voiceName ? ` · ${voiceName}` : ""}{info.model_id ? ` · ${info.model_id}` : ""}.
+        Fixed operational phrases only (never medical advice).</p>}
+      {state === "not_configured" && <p className="muted small">ElevenLabs is not configured on the server. Add{" "}
+        <code>ELEVENLABS_API_KEY</code> and <code>ELEVENLABS_VOICE_ID</code> to <code>.env</code> and restart the API.
         Status updates are shown as text only.</p>}
+      {state === "error" && lastError && <p className="error">{lastError}</p>}
       <ul className="announce" aria-live="polite">
-        {log.slice(0, 6).map((a) => <li key={a.id}><span aria-hidden>{a.spoken ? "🔊" : "💬"}</span>{a.text}</li>)}
+        {log.slice(0, 6).map((a) => (
+          <li key={a.id}>
+            <span aria-hidden title={a.delivery}>{a.delivery === "spoken" ? "🔊" : a.delivery === "pending" ? "⏳" : "💬"}</span>
+            <span className="grow">{a.text}</span>
+            <span className="muted small tabular">{new Date(a.at).toLocaleTimeString()}</span>
+          </li>
+        ))}
         {log.length === 0 && <li className="muted">No announcements yet.</li>}
       </ul>
+      <p className="muted small">🔊 spoken by ElevenLabs · 💬 shown as text only</p>
     </Card>
   );
 }

@@ -59,6 +59,7 @@ export const api = {
       throw new ApiError((body as { error?: string }).error || `HTTP ${res.status}`, res.status);
     }
   },
+  voice: () => request<{ configured: boolean; model_id: string | null; voice: { id: string; name: string | null } | null }>(`${API_BASE}/api/voice`),
   /** Returns an audio Blob, or throws ApiError(501) when ElevenLabs is not configured. */
   async speak(message: string): Promise<Blob> {
     let res: Response;

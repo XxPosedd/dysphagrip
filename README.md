@@ -16,7 +16,7 @@ shows waveform, spectrogram, motion, signal quality and experimental event marke
 |---|---|---|
 | Best Overall Hack | End-to-end live audio + motion capture, synchronised dashboard, signal quality, history | Audio service ✅ · dashboard ✅ (audio) · motion 🚧 |
 | Bright Data: Data for Good | Attributed public-interest swallowing/dysphagia resources with source URL + retrieval time | 🚧 Phase 8 |
-| ElevenLabs | Spoken status: "Recording started", "Movement interference detected", … | Server adapter exists · 🚧 Phase 7 |
+| ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Implemented and tested · live voice check pending API key |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
 An integration is only claimed once it is implemented, tested and visible in the demo.
@@ -101,6 +101,17 @@ Open http://localhost:5173 with the audio service and `npm run dev` running.
 
 Keyboard: **M** adds a manual marker during a session.
 
+## ElevenLabs (voice feedback)
+
+1. Create an API key at [elevenlabs.io](https://elevenlabs.io) (*profile → API Keys*) and pick a voice (*Voices → copy voice ID*).
+2. Add to `.env`: `ELEVENLABS_API_KEY=…` and `ELEVENLABS_VOICE_ID=…` (optional `ELEVENLABS_MODEL_ID`, default `eleven_multilingual_v2`).
+3. Restart the API. The **ElevenLabs** chip turns green; use **▶ Test voice** in the Voice feedback panel.
+
+The server speaks only a fixed list of operational phrases (`server/src/voice/phrases.ts`): session start/stop/save,
+signal detected/lost, clipping, hum, motion connected/lost, movement interference. It never speaks free text,
+so the endpoint cannot be used to spend your quota, and it never produces medical advice. Each phrase is synthesised once
+and then served from memory. Every announcement is also shown as text (🔊 spoken / 💬 text only).
+
 ## Neon (database)
 
 1. **Easiest:** with the Neon CLI (`npm i -g neon`), run `neon login`, then in the repo root
@@ -156,7 +167,9 @@ the Express server only. Anything prefixed `VITE_` is shipped to the browser and
 - `GET /api/sessions/:id`: one session with its markers
 - `DELETE /api/sessions/:id`: delete a session (and its markers and quality rows)
 - Session routes return 503 when Neon is not configured, 400 with a reason for invalid input, and 502 with a redacted message on database errors
-- `POST /api/voice/status`: ElevenLabs TTS (501 when not configured)
+- `GET /api/voice`: voice configuration (configured, model, voice name) and the approved phrase list
+- `POST /api/voice/status` `{message}`: speak one **approved** phrase via ElevenLabs and return MP3. 400 for any
+  other text, 501 not configured, 429 local rate limit (30 uncached calls/min), 502/503/504 mapped ElevenLabs errors
 - `GET /api/resources`: public resources (empty until Phase 8)
 
 The audio service API and WebSocket contract are documented in [services/audio/README.md](services/audio/README.md).
@@ -169,7 +182,7 @@ The audio service API and WebSocket contract are documented in [services/audio/R
 - [ ] Phase 4: shared session clock
 - [x] Phase 5: React dashboard (audio side live; motion panels wait for Phase 3)
 - [x] Phase 6: Neon (live: tables migrated, `npm run test:db` passing, dashboard sessions saved and read back)
-- [ ] Phase 7: ElevenLabs
+- [x] Phase 7: ElevenLabs (allowlisted phrases, caching, rate limit; live check pending `ELEVENLABS_API_KEY`)
 - [ ] Phase 8: Bright Data
 - [ ] Phase 9: deployment
 

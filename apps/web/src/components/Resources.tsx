@@ -11,7 +11,9 @@ const VIA: Record<PublicResource["collected_via"], string> = {
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
 /** Attributed public-interest resources (US). Every card shows source, publisher, collection method and dates. */
-export function ResourcesPanel({ brightDataConfigured }: { brightDataConfigured: boolean }) {
+export function ResourcesPanel({ brightDataConfigured, onBrightDataCount }: {
+  brightDataConfigured: boolean; onBrightDataCount?: (n: number) => void;
+}) {
   const [items, setItems] = useState<PublicResource[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +34,20 @@ export function ResourcesPanel({ brightDataConfigured }: { brightDataConfigured:
 
   const shown = (items ?? []).filter((r) => lang === "all" || r.language === lang);
   const viaBrightData = (items ?? []).filter((r) => r.collected_via === "bright_data_web_unlocker").length;
+  useEffect(() => { onBrightDataCount?.(viaBrightData); }, [viaBrightData, onBrightDataCount]);
+  // Collection runs offline (npm run resources:refresh), so a hosted read-only site has no Bright Data token but
+  // still shows Bright Data-collected resources. Say which applies instead of showing "not configured".
+  const bdChip = brightDataConfigured
+    ? <Chip tone="good" title="Bright Data collection is configured on this server">Bright Data</Chip>
+    : viaBrightData > 0
+      ? <Chip tone="good" title="Showing resources collected via Bright Data; collection runs offline with npm run resources:refresh">Bright Data · {viaBrightData} collected</Chip>
+      : <Chip tone="neutral">Bright Data not configured</Chip>;
   const hasSpanish = (items ?? []).some((r) => r.language === "es");
 
   return (
     <Card title="Swallowing support resources (US)" aside={
       <div className="row">
-        <Chip tone={brightDataConfigured ? "good" : "neutral"}>{brightDataConfigured ? "Bright Data" : "Bright Data not configured"}</Chip>
+        {bdChip}
         {hasSpanish && (
           <div className="seg" role="group" aria-label="Language">
             {(["all", "en", "es"] as const).map((l) => (

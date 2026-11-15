@@ -27,6 +27,7 @@ export default function App() {
   const voiceRef = useRef(voice);
   voiceRef.current = voice;   // listeners registered on the recorder always use the current toggle state
   const [health, setHealth] = useState<ApiHealth | null>(null);
+  const [brightDataCount, setBrightDataCount] = useState(0);  // resources collected via Bright Data (shown on hosted demo too)
   const [apiDown, setApiDown] = useState(false);
   const [activeTab, setActiveTab] = useState<"monitor" | "anomaly">("monitor");
 
@@ -220,7 +221,7 @@ export default function App() {
                 title={db === "not_configured" ? "Set DATABASE_URL in .env" : db === "unreachable" ? "DATABASE_URL is set but Neon did not respond" : "Connected"}>
                 {db === "unreachable" ? "Neon unreachable" : "Neon"}</Chip>}
           {integ(health?.integrations.elevenlabs, "ElevenLabs", "set ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID")}
-          {integ(health?.integrations.brightdata, "Bright Data", "set BRIGHTDATA_API_TOKEN and BRIGHTDATA_ZONE")}
+          {integ(health?.integrations.brightdata || brightDataCount > 0, "Bright Data", "set BRIGHTDATA_API_TOKEN and BRIGHTDATA_ZONE")}
         </div>
       </header>
 
@@ -335,7 +336,7 @@ export default function App() {
         onRefresh={() => { void loadHealth(); if (db === "ok") void loadSessions(); }}
         onRetry={retrySave} onDelete={deleteRemote} />
 
-      <ResourcesPanel brightDataConfigured={health?.integrations.brightdata ?? false} />
+      <ResourcesPanel brightDataConfigured={health?.integrations.brightdata ?? false} onBrightDataCount={setBrightDataCount} />
 
       </> : <section className="card anomaly-view">
         <div className="card-head"><h2>AI anomaly review</h2><Chip tone="warning">Research mode</Chip></div>

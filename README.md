@@ -38,7 +38,7 @@ El monitor web trabaja con características de audio y movimiento. Los WAV por m
 | ElevenLabs | Spoken status: "Recording started", "Audio signal detected", "Movement interference detected", "Session saved successfully" | ✅ Live: voice "Matilda", spoken cues verified in the dashboard |
 | Neon | Sessions, event markers, signal-quality summaries in Neon Postgres | ✅ Live: project `restless-shape-44821324`, migrated, round-trip test and dashboard save verified |
 
-| Vultr (MLH) | Hosted read-only demo of the dashboard + API (Docker) | 🔜 Deploying: one-command setup `deploy/vultr-setup.sh` (Docker, read-only mode, HTTPS via sslip.io); see [docs/DEPLOY.md](docs/DEPLOY.md) |
+| Vultr (MLH) | Hosted read-only demo of the dashboard + API (Docker on Vultr Cloud Compute) | ✅ Live: https://66-42-64-41.sslip.io (HTTPS; read-only; live capture runs on the presenter's laptop) |
 | GoDaddy Registry (MLH) | Domain for the hosted demo (code MLHSH77) | ⏭ Skipped: the available domain ending does not allow WHOIS privacy. The hosted demo uses an sslip.io HTTPS address instead |
 
 An integration is only claimed once it is implemented, tested and visible in the demo.

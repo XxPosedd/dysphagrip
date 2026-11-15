@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DysphaGrip Audio Diagnostics</title>
+<style>
+  :root { --bg:#0b1117; --panel:#121b23; --line:#223140; --text:#dbe6ee; --muted:#7f93a3;
+          --accent:#3fd3a6; --warn:#f2b84b; --bad:#f06b6b; --file:#8fa8ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:1180px; margin:0 auto; padding:24px 16px 48px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+  h1 { margin:0; font-size:22px; letter-spacing:.01em; } h1 small { color:var(--muted); font-weight:500; font-size:13px; margin-left:8px; }
+  .notice { color:var(--muted); font-size:12px; margin-top:4px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:12px; font-weight:650; background:#1b2733; color:var(--muted); }
+  .badge.live { background:#11372c; color:var(--accent); } .badge.file { background:#1d2547; color:var(--file); }
+  .badge.ok { background:#11372c; color:var(--accent); } .badge.warn { background:#3a2e12; color:var(--warn); } .badge.bad { background:#3d1a1a; color:var(--bad); }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  select, button { font:inherit; background:#0d151c; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  select { min-width:280px; max-width:100%; }
+  button { cursor:pointer; font-weight:650; } button.primary { background:var(--accent); color:#06231a; border-color:transparent; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .head h2 { margin:0; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  canvas { width:100%; display:block; border-radius:8px; background:#070c10; }
+  #wave { height:180px; } #spec { height:220px; image-rendering:pixelated; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+  .metric { background:#0d151c; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .metric span { display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .metric strong { font-size:18px; font-variant-numeric:tabular-nums; }
+  #reasons { margin:8px 0 0; padding-left:18px; color:var(--warn); font-size:13px; }
+  #error { color:var(--bad); font-size:13px; min-height:1em; margin-top:8px; }
+  .meta { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
+  .axis { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:4px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>DysphaGrip <small>audio diagnostics</small></h1>
+      <div class="notice">Experimental engineering prototype. Signal features only, not a clinical assessment.</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <span id="conn" class="badge">● disconnected</span>
+      <span id="state" class="badge">● stopped</span>
+      <span id="quality" class="badge">quality: —</span>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <label>Input device <select id="device"></select></label>
+      <label>Channel <select id="channel"></select></label>
+      <button id="refresh">Refresh devices</button>
+      <button id="start" class="primary">Start</button>
+      <button id="stop">Stop</button>
+    </div>
+    <div id="hint" style="color:var(--warn);font-size:13px;margin-top:8px"></div>
+    <div id="error"></div>
+    <div id="meta" class="meta"></div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><h2>Waveform · last 5 s (20 Hz high-pass)</h2><span id="scale" class="meta"></span></div>
+    <canvas id="wave"></canvas>
+  </section>
+
+  <section class="panel">
+    <div class="head"><h2>Spectrogram · last 15 s</h2><span id="range" class="meta"></span></div>
+    <canvas id="spec"></canvas>
+    <div class="axis"><span>−15 s</span><span>now</span></div>
+  </section>
+
+  <section class="panel">
+    <div class="grid">
+      <div class="metric"><span>RMS level</span><strong id="m-rms">—</strong></div>
+      <div class="metric"><span>Noise floor</span><strong id="m-floor">—</strong></div>
+      <div class="metric"><span>Above floor</span><strong id="m-snr">—</strong></div>
+      <div class="metric"><span>Audio activity</span><strong id="m-act">—</strong></div>
+      <div class="metric"><span>Peak</span><strong id="m-peak">—</strong></div>
+      <div class="metric"><span>Dominant freq</span><strong id="m-dom">—</strong></div>
+      <div class="metric"><span>Spectral centroid</span><strong id="m-cent">—</strong></div>
+      <div class="metric"><span>50/60 Hz hum</span><strong id="m-hum">—</strong></div>
+      <div class="metric"><span>Clipping</span><strong id="m-clip">—</strong></div>
+      <div class="metric"><span>Band low/mid/high</span><strong id="m-band">—</strong></div>
+    </div>
+    <ul id="reasons"></ul>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const base = location.origin;
+const WAVE_FRAMES = 100;   // 5 s at 20 fps
+const SPEC_COLS = 300;     // 15 s at 20 fps
+const DB_MIN = -120, DB_MAX = -20;
+let waveHist = [];
+let specCanvas = null, specCtx = null, specBins = 0;
+let um2Index = null, runningDevice = null;
+
+function setBadge(el, text, cls) { el.textContent = text; el.className = "badge " + (cls || ""); }
+
+async function api(path, opts) {
+  const r = await fetch(base + path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || r.statusText);
+  return body;
+}
+
+async function loadDevices() {
+  try {
+    const { devices, um2_candidate } = await api("/devices");
+    um2Index = um2_candidate;
+    const sel = $("device"); sel.innerHTML = "";
+    for (const d of devices) {
+      const o = document.createElement("option");
+      o.value = d.index; o.dataset.channels = d.max_input_channels;
+      const tag = d.um2_match === "strong" ? " ★ UM2" : d.um2_match === "possible" ? " ☆ possible UM2" : "";
+      o.textContent = `[${d.index}] ${d.name} · ${d.hostapi || ""} · ${d.max_input_channels}ch${tag}${d.is_default ? " (default)" : ""}`;
+      sel.appendChild(o);
+    }
+    if (runningDevice !== null) sel.value = String(runningDevice);
+    else if (um2_candidate !== null) sel.value = String(um2_candidate);
+    fillChannels();
+    $("hint").textContent = um2_candidate === null ? "Behringer UM2 not detected. Showing all inputs." : "";
+  } catch (e) { $("error").textContent = "Device list failed: " + e.message; }
+}
+
+function fillChannels() {
+  const opt = $("device").selectedOptions[0];
+  const n = opt ? Number(opt.dataset.channels) : 1;
+  const sel = $("channel"); sel.innerHTML = "";
+  for (let c = 0; c < n; c++) {
+    const o = document.createElement("option"); o.value = c;
+    o.textContent = `ch ${c} (input ${c + 1})`; sel.appendChild(o);
+  }
+}
+
+$("device").onchange = fillChannels;
+$("refresh").onclick = loadDevices;
+$("start").onclick = async () => {
+  $("error").textContent = "";
+  try {
+    await api("/start", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device: Number($("device").value), channel: Number($("channel").value) }) });
+    waveHist = []; resetSpec();
+  } catch (e) { $("error").textContent = e.message; }
+};
+$("stop").onclick = async () => { try { await api("/stop", { method: "POST" }); } catch (e) { $("error").textContent = e.message; } };
+
+function showStatus(s) {
+  if (!s.running) { setBadge($("state"), "● stopped"); $("meta").textContent = ""; }
+  else if (s.source.kind === "file") setBadge($("state"), "● FILE PLAYBACK (not live)", "file");
+  else setBadge($("state"), "● LIVE", "live");
+  runningDevice = s.running && s.source && s.source.device_index !== undefined ? s.source.device_index : null;
+  if (runningDevice !== null && $("device").querySelector(`option[value="${runningDevice}"]`)) {
+    $("device").value = String(runningDevice); fillChannels(); $("channel").value = String(s.source.channel);
+  }
+  if (s.source) {
+    const src = s.source;
+    $("meta").textContent = src.kind === "file"
+      ? `file ${src.file} · ${src.samplerate} Hz · ch ${src.channel}`
+      : `${src.device_name} · ${src.hostapi} · ch ${src.channel} · ${src.samplerate} Hz · anchor: ${src.anchor_method || "pending"} · overflows ${src.overflows}`;
+  }
+  if (s.last_error) $("error").textContent = s.last_error;
+}
+
+function resetSpec() {
+  specCanvas = null;
+  const c = $("spec"); c.getContext("2d").clearRect(0, 0, c.width, c.height);
+}
+
+// Perceptual-ish colormap: deep navy -> violet -> orange -> pale yellow
+const STOPS = [[7,12,16],[40,22,92],[140,40,120],[228,95,60],[252,200,90],[255,250,210]];
+function color(t) {
+  t = Math.min(1, Math.max(0, t)) * (STOPS.length - 1);
+  const i = Math.min(STOPS.length - 2, Math.floor(t)), f = t - i, a = STOPS[i], b = STOPS[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+}
+
+function sizeCanvas(c) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+}
+
+function drawWave() {
+  const c = $("wave"); sizeCanvas(c);
+  const ctx = c.getContext("2d"), W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = "#1c2a36"; ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+  if (!waveHist.length) return;
+  const mins = waveHist.flatMap((f) => f.min), maxs = waveHist.flatMap((f) => f.max);
+  let peak = 1e-4; for (let i = 0; i < maxs.length; i++) peak = Math.max(peak, maxs[i], -mins[i]);
+  const scale = (H / 2 - 4) / peak;
+  $("scale").textContent = `auto-scale ±${peak.toFixed(4)} FS`;
+  const total = WAVE_FRAMES * (waveHist[0].min.length || 1);
+  const offset = total - mins.length;   // right-align so new data enters from the right
+  ctx.fillStyle = "#3fd3a6";
+  for (let x = 0; x < W; x++) {
+    const a = Math.floor((x / W) * total) - offset, b = Math.floor(((x + 1) / W) * total) - offset;
+    if (b <= 0) continue;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = Math.max(0, a); i < Math.max(a + 1, b) && i < mins.length; i++) { lo = Math.min(lo, mins[i]); hi = Math.max(hi, maxs[i]); }
+    if (lo === Infinity) continue;
+    const y1 = H / 2 - hi * scale, y2 = H / 2 - lo * scale;
+    ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+  }
+}
+
+function pushSpec(spec) {
+  const bins = spec.db.length;
+  if (!specCanvas || specBins !== bins) {
+    specCanvas = document.createElement("canvas"); specCanvas.width = SPEC_COLS; specCanvas.height = bins;
+    specCtx = specCanvas.getContext("2d"); specCtx.fillStyle = "rgb(7,12,16)"; specCtx.fillRect(0, 0, SPEC_COLS, bins); specBins = bins;
+  }
+  specCtx.drawImage(specCanvas, -1, 0);
+  const col = specCtx.createImageData(1, bins);
+  for (let i = 0; i < bins; i++) {
+    const [r, g, b] = color((spec.db[i] - DB_MIN) / (DB_MAX - DB_MIN));
+    const p = (bins - 1 - i) * 4;   // low frequencies at the bottom
+    col.data[p] = r; col.data[p + 1] = g; col.data[p + 2] = b; col.data[p + 3] = 255;
+  }
+  specCtx.putImageData(col, SPEC_COLS - 1, 0);
+  const c = $("spec"); sizeCanvas(c);
+  const ctx = c.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(specCanvas, 0, 0, c.width, c.height);
+  $("range").textContent = `0–${spec.fmax_hz} Hz · ${DB_MIN} to ${DB_MAX} dBFS`;
+}
+
+function showFeatures(f, q) {
+  $("m-rms").textContent = `${f.rms_dbfs} dBFS`;
+  $("m-floor").textContent = `${f.noise_floor_dbfs} dBFS`;
+  $("m-snr").textContent = `${f.snr_db} dB`;
+  $("m-act").textContent = f.activity ? "active" : "quiet";
+  $("m-peak").textContent = f.peak.toFixed(3);
+  $("m-dom").textContent = `${Math.round(f.dominant_hz)} Hz`;
+  $("m-cent").textContent = `${Math.round(f.spectral_centroid_hz)} Hz`;
+  $("m-hum").textContent = `${Math.round(f.hum_ratio * 100)}%`;
+  $("m-clip").textContent = `${(f.clip_fraction * 100).toFixed(2)}%`;
+  const b = f.band_fraction; $("m-band").textContent = `${Math.round(b.low * 100)}/${Math.round(b.mid * 100)}/${Math.round(b.high * 100)}%`;
+  const cls = q.label === "ok" ? "ok" : q.label === "no_signal" ? "bad" : "warn";
+  setBadge($("quality"), `quality: ${q.label.replace("_", " ")}`, cls);
+  $("reasons").innerHTML = q.reasons.map((r) => `<li>${r}</li>`).join("");
+}
+
+function connect() {
+  const ws = new WebSocket(base.replace(/^http/, "ws") + "/stream");
+  ws.onopen = () => setBadge($("conn"), "● connected", "ok");
+  ws.onclose = () => { setBadge($("conn"), "● disconnected", "bad"); setTimeout(connect, 1500); };
+  ws.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "hello" || m.type === "status") showStatus(m);
+    else if (m.type === "error") $("error").textContent = m.message;
+    else if (m.type === "audio_frame") {
+      waveHist.push(m.waveform); if (waveHist.length > WAVE_FRAMES) waveHist.shift();
+      pushSpec(m.spectrum); showFeatures(m.features, m.quality);
+    }
+  };
+}
+
+let raf = 0;
+(function loop() { drawWave(); raf = requestAnimationFrame(loop); })();
+loadDevices(); connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Audio service (UM2, channel 1)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "dysphagrip_audio",
+      "args": ["serve", "--device", "um2", "--channel", "1", "--autostart"],
+      "cwd": "${workspaceFolder}/services/audio",
+      "python": "${workspaceFolder}/services/audio/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/services/audio/.venv/Scripts/python.exe" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Audio service (pick device in viewer)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "dysphagrip_audio",
+      "args": ["serve"],
+      "cwd": "${workspaceFolder}/services/audio",
+      "python": "${workspaceFolder}/services/audio/.venv/bin/python",
+      "windows": { "python": "${workspaceFolder}/services/audio/.venv/Scripts/python.exe" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "API server (Express)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "server"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

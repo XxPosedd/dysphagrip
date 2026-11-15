@@ -1,0 +1,10 @@
+# DysphaGrip audio service (Python 3.10+; verified on 3.14)
+numpy>=1.26
+scipy>=1.11
+sounddevice>=0.4.6        # PortAudio bindings (bundled on macOS/Windows wheels)
+fastapi>=0.110
+uvicorn[standard]>=0.27   # includes websockets support
+
+# Tests
+pytest>=8.0
+httpx>=0.27               # required by fastapi.testclient

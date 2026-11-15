@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup: Python audio venv",
+      "type": "shell",
+      "command": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+      "windows": { "command": "python -m venv .venv; .venv\\Scripts\\pip install -r requirements.txt" },
+      "options": { "cwd": "${workspaceFolder}/services/audio" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Setup: npm install",
+      "type": "shell",
+      "command": "npm install && npm run install:all",
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: API + web",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: audio (pytest)",
+      "type": "shell",
+      "command": ".venv/bin/python -m pytest -q",
+      "windows": { "command": ".venv\\Scripts\\python -m pytest -q" },
+      "options": { "cwd": "${workspaceFolder}/services/audio" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: server (vitest)",
+      "type": "shell",
+      "command": "npm test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Audio: list devices",
+      "type": "shell",
+      "command": ".venv/bin/python -m dysphagrip_audio devices",
+      "windows": { "command": ".venv\\Scripts\\python -m dysphagrip_audio devices" },
+      "options": { "cwd": "${workspaceFolder}/services/audio" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Audio: probe UM2 channels",
+      "type": "shell",
+      "command": ".venv/bin/python -m dysphagrip_audio probe --device um2",
+      "windows": { "command": ".venv\\Scripts\\python -m dysphagrip_audio probe --device um2" },
+      "options": { "cwd": "${workspaceFolder}/services/audio" },
+      "problemMatcher": []
+    }
+  ]
+}
